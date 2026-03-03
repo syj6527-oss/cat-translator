@@ -4,21 +4,38 @@
 /* 💡 실리태번 기본 껍데기 박스([]) 원천 차단 */
 #cat-trans-container .inline-drawer-icon { display: none !important; }
 
-/* 💡 순정 토글 화살표와 디자인/애니메이션 완벽 동기화 */
+/* 💡 헤더 레이아웃: 제목은 왼쪽, 화살표는 오른쪽 끝으로 완벽 동기화 */
+#cat-trans-container .inline-drawer-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    cursor: pointer !important;
+    padding: 10px !important;
+}
+
+#cat-trans-container .inline-drawer-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex: 1 !important;
+    font-family: inherit;
+}
+
+/* 💡 순정 토글 화살표 디자인 및 위치 동기화 */
 #cat-trans-container .inline-drawer-toggle {
     transition: transform 0.2s ease-in-out !important;
     font-size: 0.9em !important;
     opacity: 0.7 !important;
-    cursor: pointer !important;
     margin-left: auto !important;
+    pointer-events: none; /* 헤더 클릭 이벤트를 방해하지 않음 */
 }
 
-/* 💡 화살표 회전 애니메이션 클래스 강제 적용 */
+/* 💡 화살표 회전 애니메이션 강제 적용 */
 .fa-rotate-180 {
     transform: rotate(180deg) !important;
 }
 
-/* 💡 설정 저장 버튼 스타일 */
+/* 💡 설정 저장 버튼 스타일 (졸귀 아이콘 유지) */
 #cat-save-btn {
     background-color: rgba(168, 199, 250, 0.15);
     border: 1px solid #a8c7fa;
@@ -27,6 +44,9 @@
     padding: 8px;
     border-radius: 6px;
     transition: all 0.2s;
+    cursor: pointer;
+    width: 100%;
+    font-family: inherit;
 }
 #cat-save-btn:hover {
     background-color: rgba(168, 199, 250, 0.3);
