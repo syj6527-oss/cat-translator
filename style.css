@@ -1,7 +1,7 @@
 .cat-setting-row { margin-bottom: 12px; }
 .cat-setting-row > label { display: block; margin-bottom: 4px; font-weight: bold; opacity: 0.9; font-size: 0.9em; font-family: inherit; }
 
-/* 💡 [v4.3.0] 빈 박스([]) 원천 차단 - 최상위 선택자 */
+/* 💡 [v4.4.0] 빈 박스([]) 원천 차단 - 최상위 선택자 */
 div[id="cat-trans-container"] .inline-drawer-icon,
 #cat-trans-container .inline-drawer-icon { 
     display: none !important; 
@@ -9,6 +9,7 @@ div[id="cat-trans-container"] .inline-drawer-icon,
     height: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
+    overflow: hidden !important;
 }
 
 /* 헤더 레이아웃 */
@@ -63,13 +64,13 @@ div[id="cat-trans-container"] .inline-drawer-icon,
     box-shadow: 0 0 12px rgba(168, 199, 250, 0.3);
 }
 
-/* 💡 [v4.3.0] 입력창 아이콘 위치 정밀 교정 */
+/* 💡 [v4.4.0] 입력창 아이콘 위치 및 여백 정밀 교정 */
 #cat-input-btn {
     display: inline-flex !important;
     align-items: center !important;
     vertical-align: middle !important;
     height: 100% !important;
-    padding-bottom: 2px !important; /* 미세한 상하 정렬 조정 */
+    margin-right: 8px !important; /* 💡 오른쪽 빈 공간 제거 */
 }
 
 /* 고양이 애니메이션 */
