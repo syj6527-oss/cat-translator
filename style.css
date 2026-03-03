@@ -1,15 +1,16 @@
 .cat-setting-row { margin-bottom: 12px; }
 .cat-setting-row > label { display: block; margin-bottom: 4px; font-weight: bold; opacity: 0.9; font-size: 0.9em; font-family: inherit; }
 
-/* 💡 [v4.4.0] 빈 박스([]) 원천 차단 - 최상위 선택자 */
+/* 💡 [v4.6.0] 빈 박스([]) 완전 박멸 - 가장 높은 우선순위 강제 */
 div[id="cat-trans-container"] .inline-drawer-icon,
-#cat-trans-container .inline-drawer-icon { 
+#cat-trans-container .inline-drawer-icon,
+.inline-drawer .inline-drawer-icon:has(+ .inline-drawer-title:contains("트랜스레이터")) { 
     display: none !important; 
     width: 0 !important;
     height: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
-    overflow: hidden !important;
+    visibility: hidden !important;
 }
 
 /* 헤더 레이아웃 */
@@ -64,13 +65,19 @@ div[id="cat-trans-container"] .inline-drawer-icon,
     box-shadow: 0 0 12px rgba(168, 199, 250, 0.3);
 }
 
-/* 💡 [v4.4.0] 입력창 아이콘 위치 및 여백 정밀 교정 */
+/* 💡 [v4.6.0] 입력창 아이콘 밀착 및 공간 확보 */
 #cat-input-btn {
     display: inline-flex !important;
     align-items: center !important;
     vertical-align: middle !important;
     height: 100% !important;
-    margin-right: 8px !important; /* 💡 오른쪽 빈 공간 제거 */
+    margin-right: 2px !important; /* 💡 여백 최소화 */
+}
+
+#cat-input-revert-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    margin-right: 4px !important; /* 💡 여백 최소화 */
 }
 
 /* 고양이 애니메이션 */
