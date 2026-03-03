@@ -1,78 +1,17 @@
 .cat-setting-row { margin-bottom: 12px; }
 .cat-setting-row > label { display: block; margin-bottom: 4px; font-weight: bold; opacity: 0.9; font-size: 0.9em; font-family: inherit; }
 
-/* 💡 빈 박스([]) 완전 박멸 */
-div[id="cat-trans-container"] .inline-drawer-icon,
-#cat-trans-container .inline-drawer-icon { 
-    display: none !important; 
-    width: 0 !important;
-    height: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-/* 헤더 레이아웃 */
-#cat-trans-container .inline-drawer-header {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    cursor: pointer !important;
-    padding: 0.5em 0.8em !important;
-    min-height: 3em !important;
-}
-
-#cat-trans-container .inline-drawer-title {
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-    flex: 1 !important;
-    font-family: inherit;
-    font-size: 1.1em;
-}
-
-/* 순정 토글 화살표 */
-#cat-trans-container .inline-drawer-toggle {
-    transition: transform 0.2s ease-in-out !important;
-    font-size: 0.9em !important;
-    opacity: 0.7 !important;
-    margin-left: auto !important;
-}
+#cat-trans-container .inline-drawer-icon { display: none !important; width: 0 !important; height: 0 !important; padding: 0 !important; margin: 0 !important; }
+#cat-trans-container .inline-drawer-header { display: flex !important; align-items: center !important; justify-content: space-between !important; cursor: pointer !important; padding: 0.5em 0.8em !important; min-height: 3em !important; }
+#cat-trans-container .inline-drawer-title { display: flex !important; align-items: center !important; gap: 10px !important; flex: 1 !important; font-family: inherit; font-size: 1.1em; }
+#cat-trans-container .inline-drawer-toggle { transition: transform 0.2s ease-in-out !important; font-size: 0.9em !important; opacity: 0.7 !important; margin-left: auto !important; }
 .fa-rotate-180 { transform: rotate(180deg) !important; }
 
-/* 설정 저장 버튼 */
-#cat-save-btn {
-    background-color: rgba(168, 199, 250, 0.15);
-    border: 1px solid #a8c7fa;
-    color: #a8c7fa;
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 8px;
-    transition: all 0.2s;
-    cursor: pointer;
-    width: 100%;
-    font-family: inherit;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-#cat-save-btn:hover {
-    background-color: rgba(168, 199, 250, 0.3);
-    box-shadow: 0 0 12px rgba(168, 199, 250, 0.3);
-}
+#cat-save-btn { background-color: rgba(168, 199, 250, 0.15); border: 1px solid #a8c7fa; color: #a8c7fa; margin-top: 10px; padding: 10px; border-radius: 8px; transition: all 0.2s; cursor: pointer; width: 100%; font-family: inherit; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
+#cat-save-btn:hover { background-color: rgba(168, 199, 250, 0.3); box-shadow: 0 0 12px rgba(168, 199, 250, 0.3); }
 
-/* 💡 입력창 아이콘 초밀착 및 공간 최대 확보 */
-#cat-input-btn, #cat-input-revert-btn { 
-    display: inline-flex !important; 
-    align-items: center !important; 
-    vertical-align: middle !important; 
-    height: 100% !important; 
-}
-#cat-input-btn { margin-right: 1px !important; }
-#cat-input-revert-btn { margin-right: 2px !important; }
+#cat-input-btn, #cat-input-revert-btn { display: inline-flex !important; align-items: center !important; vertical-align: middle !important; height: 100% !important; margin-right: 1px !important; }
 
-/* 애니메이션 */
 .cat-spin-anim { display: inline-block !important; animation: cat-emoji-spin 1.2s infinite linear !important; }
 @keyframes cat-emoji-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
