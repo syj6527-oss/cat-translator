@@ -1,34 +1,33 @@
-/* 🐱 커스텀 고양이 아이콘 스타일 정의 */
+.flash-setting-row { margin-bottom: 12px; }
+.flash-setting-row > label { display: block; margin-bottom: 4px; font-weight: bold; opacity: 0.9; font-size: 0.9em; }
+
+/* 🐱 커스텀 고양이 아이콘 디자인 */
 .custom-cat-icon {
     display: inline-block;
-    width: 20px;
-    height: 20px;
+    width: 1.2em;
+    height: 1.2em;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 576 512'%3E%3Cpath fill='%23a8c7fa' d='M320 192h17.1c22.1 38.3 63.5 64 110.9 64c11 0 21.8-1.4 32-4v4 32V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V339.2L280 448h56c17.7 0 32 14.3 32 32s-14.3 32-32 32H192c-17.7 0-32-14.3-32-32s14.3-32 32-32h56L128 339.2V480c0 17.7-14.3 32-32 32s-32-14.3-32-32V288 256 252c10.2 2.6 21 4 32 4c47.4 0 88.8-25.7 110.9-64H224c-17.7 0-32-14.3-32-32s14.3-32 32-32h96c17.7 0 32 14.3 32 32s-14.3 32-32 32zM0 224a128 128 0 1 1 256 0A128 128 0 1 1 0 224zM320 224a128 128 0 1 1 256 0A128 128 0 1 1 320 224zM100.6 210.7c-7.4-12.6-23.8-16.8-36.4-9.5s-16.8 23.8-9.5 36.4l15.1 25.7c7.4 12.6 23.8 16.8 36.4 9.5s16.8-23.8 9.5-36.4L100.6 210.7zM521.4 237.6c7.4-12.6 3.2-29-9.5-36.4s-29-3.2-36.4 9.5l-15.1 25.7c-7.4 12.6-3.2 29 9.5 36.4s29 3.2 36.4-9.5l15.1-25.7z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: center;
     background-size: contain;
-    transition: transform 0.2s, filter 0.2s;
     vertical-align: middle;
-    opacity: 0.6;
+    transition: all 0.2s;
+    opacity: 0.5;
 }
-.custom-cat-icon:hover, .flash-mes-trans-btn:hover .custom-cat-icon, #flash-input-cat-btn:hover .custom-cat-icon {
-    transform: scale(1.1);
-    filter: brightness(0) invert(1);
-    opacity: 1;
-}
-.fa-spin .custom-cat-icon { animation: fa-spin 2s infinite linear; }
-.flash-setting-row { margin-bottom: 12px; }
-.flash-setting-row > label { display: block; margin-bottom: 4px; font-weight: bold; opacity: 0.9; font-size: 0.9em; }
-#flash-input-cat-btn { cursor: pointer; margin-right: 5px; display: inline-flex; align-items: center; }
-#flash-input-revert-icon { cursor: pointer; margin-right: 10px; color: #ffb4a2; font-size: 1.2em; transition: transform 0.2s; opacity: 0.8; vertical-align: middle; }
-#flash-input-revert-icon:hover { transform: scale(1.1); opacity: 1; color: #fff; }
-.flash-btn-group { display: inline-flex; gap: 8px; margin-left: 10px; vertical-align: middle; align-items: center; }
-.flash-mes-trans-btn, .flash-mes-revert-btn {
-    cursor: pointer;
-    opacity: 0.4;
-    font-size: 0.9em;
-    transition: all 0.2s ease;
-    display: flex; align-items: center;
-}
-.flash-mes-trans-btn:hover { opacity: 1; }
-.flash-mes-revert-btn:hover { opacity: 1; color: #ffb4a2; }
+
+/* 입력창 고양이 & 되돌리기 */
+#flash-input-cat-btn { cursor: pointer; margin-right: 8px; display: inline-flex; align-items: center; }
+#flash-input-cat-btn:hover .custom-cat-icon { opacity: 1; filter: brightness(1.5); transform: scale(1.1); }
+#flash-input-revert-icon { cursor: pointer; margin-right: 10px; color: #ffb4a2; font-size: 1.2em; transition: all 0.2s; opacity: 0.6; }
+#flash-input-revert-icon:hover { opacity: 1; transform: scale(1.1); }
+
+/* 채팅창 버튼 그룹 */
+.flash-btn-group { display: inline-flex; gap: 10px; margin-left: 10px; vertical-align: middle; align-items: center; }
+.flash-mes-trans-btn, .flash-mes-revert-btn { cursor: pointer; transition: all 0.2s; display: flex; align-items: center; }
+.flash-mes-trans-btn .custom-cat-icon { opacity: 0.4; }
+.flash-mes-trans-btn:hover .custom-cat-icon { opacity: 1; filter: brightness(1.5); }
+.flash-mes-revert-btn { color: #ffb4a2; font-size: 0.9em; opacity: 0.4; }
+.flash-mes-revert-btn:hover { opacity: 1; color: #fff; }
+
+/* 로딩 애니메이션 */
+.fa-spin { animation: fa-spin 2s infinite linear; }
