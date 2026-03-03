@@ -93,8 +93,8 @@ async function processMessage(id, isInput = false) {
     if (!msg) return;
 
     const mesBlock = $(`.mes[mesid="${msgId}"]`);
-    const btnIcon = mesBlock.find('.cat-mes-trans-btn .custom-cat-icon');
-    btnIcon.addClass('fa-spin');
+    const btnIcon = mesBlock.find('.cat-mes-trans-btn .cat-emoji-icon');
+    btnIcon.addClass('cat-spin-anim');
 
     let textToTranslate = msg.mes;
     let prevTrans = null;
@@ -124,7 +124,7 @@ async function processMessage(id, isInput = false) {
         stContext.updateMessageBlock(msgId, msg); 
     }
     
-    btnIcon.removeClass('fa-spin');
+    btnIcon.removeClass('cat-spin-anim');
 }
 
 function revertMessage(id) {
@@ -149,8 +149,8 @@ function revertMessage(id) {
 
 function setupUI() {
     if (!$('#cat-input-btn').length) {
-        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:8px; display:inline-flex; align-items:center;"><span class="custom-cat-icon"></span></div>');
-        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:10px; color:#ffb4a2; font-size:1.2em; opacity:0.6;"></div>');
+        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:12px; display:inline-flex; align-items:center; font-size:1.3em;"><span class="cat-emoji-icon" style="display:inline-block;">🐱</span></div>');
+        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:10px; color:#ffb4a2; font-size:1.2em; opacity:0.6; transition:all 0.2s;"></div>');
         
         $('#send_but').before(catBtn).before(revertBtn);
         
@@ -159,7 +159,7 @@ function setupUI() {
             const currentVal = area.val();
             
             if (currentVal) {
-                catBtn.find('.custom-cat-icon').addClass('fa-spin');
+                catBtn.find('.cat-emoji-icon').addClass('cat-spin-anim');
                 
                 let textToTranslate = currentVal;
                 let prev = null;
@@ -177,7 +177,7 @@ function setupUI() {
                     textAreaTranslated = trans;
                     area.val(trans).trigger('input');
                 }
-                catBtn.find('.custom-cat-icon').removeClass('fa-spin');
+                catBtn.find('.cat-emoji-icon').removeClass('cat-spin-anim');
             }
         });
 
@@ -198,8 +198,8 @@ function setupUI() {
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
-                    <div class="inline-drawer-icon"><span class="custom-cat-icon" style="opacity:1;"></span></div>
-                    <div class="inline-drawer-title">🐱트랜스레이터</div>
+                    <div class="inline-drawer-icon"><span class="cat-emoji-icon" style="display:inline-block; font-size:1.2em;">🐱</span></div>
+                    <div class="inline-drawer-title">트랜스레이터</div>
                     <div class="inline-drawer-toggle fa-solid fa-chevron-down"></div>
                 </div>
                 <div class="inline-drawer-content" style="display: none;">
@@ -210,7 +210,7 @@ function setupUI() {
                             ${profileOptions}
                         </select>
                     </div>
-                    <div id="direct-mode-settings" style="border-left: 2px solid #4a90e2; padding-left: 10px; margin-bottom: 15px; display: ${settings.profile === '' ? 'block' : 'none'};">
+                    <div id="direct-mode-settings" style="border-left: 2px solid #a8c7fa; padding-left: 10px; margin-bottom: 15px; display: ${settings.profile === '' ? 'block' : 'none'};">
                         <div class="cat-setting-row" style="margin-bottom:12px;">
                             <label style="display:block; font-weight:bold; font-size:0.9em;">직접 연결: API Key</label>
                             <input type="password" id="ct-key" class="text_pole" placeholder="직접 입력 (선택사항)" style="width:100%;">
@@ -288,11 +288,9 @@ jQuery(() => {
     
     $(document).on('mouseenter touchstart', '.mes', function() {
         if (!$(this).find('.cat-btn-group').length) {
-            const btnGroup = $('<div class="cat-btn-group" style="display:inline-flex; gap:10px; margin-left:10px; align-items:center;"></div>');
-            const transBtn = $(
-  '<div class="cat-mes-trans-btn cat-spin" title="고양이 번역하기" style="cursor:pointer;">🐱</div>'
-);
-            const revertBtn = $('<div class="cat-mes-revert-btn fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; color:#ffb4a2; opacity:0.4;"></div>');
+            const btnGroup = $('<div class="cat-btn-group" style="display:inline-flex; gap:12px; margin-left:10px; align-items:center;"></div>');
+            const transBtn = $('<div class="cat-mes-trans-btn" title="고양이 번역하기" style="cursor:pointer; opacity:0.6; font-size:1.2em;"><span class="cat-emoji-icon" style="display:inline-block;">🐱</span></div>');
+            const revertBtn = $('<div class="cat-mes-revert-btn fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; color:#ffb4a2; opacity:0.6; font-size:1.1em;"></div>');
 
             btnGroup.append(transBtn).append(revertBtn);
             $(this).find('.name_text').append(btnGroup);
