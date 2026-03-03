@@ -1,8 +1,8 @@
 {
     "name": "cat-translator",
     "display_name": "🐱트랜스레이터",
-    "version": "3.3.0",
-    "description": "Cat Translator (Emoji Fix)",
+    "version": "3.5.0",
+    "description": "Cat Translator Pro (UI Fixed)",
     "author": "ST User",
     "js": "index.js",
     "css": "style.css"
