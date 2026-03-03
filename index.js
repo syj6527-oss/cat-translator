@@ -10,7 +10,7 @@ const defaultSettings = {
     directModel: 'gemini-1.5-flash',
     autoMode: 'none',
     targetLang: 'Korean',
-    prompt: 'Translate the following text into {{language}}. You are strictly required to translate EVERYTHING including contents inside code blocks. \n\nCRITICAL RULE: Output EXACTLY and ONLY the translated text. ABSOLUTELY NO explanations, dictionary definitions, nuances, or conversational filler. Even if the input is a single short word, output ONLY the translated word.',
+    prompt: 'You are a highly skilled professional translator. Translate the given text into {{language}}.\n\nCRITICAL RULE: Maintain all HTML tags (e.g., <font>, <details>, <summary>, <div>), CSS styles, and Markdown formatting exactly as they are. ONLY translate the natural language text content found inside or between these tags. Do not output raw code blocks unless the original text was a literal programming code block.',
     filterCodeBlock: true,
     maxTokens: 0
 };
@@ -28,11 +28,11 @@ function saveSettings() {
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     const targetLang = isInput ? "English" : settings.targetLang;
     const basePrompt = isInput 
-        ? "Translate the following text to English. \n\nCRITICAL REQUIREMENT: Output EXACTLY and ONLY the translated text. ABSOLUTELY NO explanations." 
+        ? "Please translate the following text into natural English. Keep all formatting intact." 
         : settings.prompt.replace('{{language}}', targetLang);
 
     const variationPrompt = previousTranslation 
-        ? `\n\n[CRITICAL INSTRUCTION: Provide a DIFFERENT phrasing than "${previousTranslation}".]` 
+        ? `\n\n[Optional: Provide a different expression than "${previousTranslation}"]` 
         : "";
 
     const promptWithText = `${basePrompt}${variationPrompt}\n\n${text}`;
@@ -49,15 +49,18 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             if (!apiKey) { toastr.error("API 키가 없습니다."); return text; }
             const model = settings.directModel.replace('models/', '');
             
-            // 💡 검열(PROHIBITED_CONTENT) 우회를 위한 안전 설정 추가
             const body = {
                 contents: [{ role: "user", parts: [{ text: promptWithText }] }],
-                generationConfig: { temperature: 0.4 },
+                generationConfig: { 
+                    temperature: 0.3,
+                    topP: 0.8
+                },
                 safetySettings: [
                     { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
                     { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
                     { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE" },
-                    { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" }
+                    { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" },
+                    { "category": "HARM_CATEGORY_CIVIC_INTEGRITY", "threshold": "BLOCK_NONE" }
                 ]
             };
             
@@ -69,13 +72,15 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             });
             const data = await response.json();
             
-            if (data.promptFeedback?.blockReason === 'PROHIBITED_CONTENT') {
-                return "[번역 거부: 수위가 너무 높거나 부적절한 내용이 포함되어 구글 필터에 걸렸습니다.]";
+            if (data.promptFeedback?.blockReason) {
+                console.warn("[Cat Translator] Blocked:", data.promptFeedback.blockReason);
+                return `[번역 거부됨: ${data.promptFeedback.blockReason}]`;
             }
             
             result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
         }
 
+        // 💡 만약 번역본이 ``` 로 감싸져서 오면 (AI의 실수), 내용만 추출
         if (settings.filterCodeBlock && result) {
             let trimmed = result.trim();
             const backticks = String.fromCharCode(96, 96, 96);
@@ -84,6 +89,8 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
                 const lastBackticks = trimmed.lastIndexOf(backticks);
                 if (firstNewLine !== -1 && lastBackticks > firstNewLine) {
                     result = trimmed.substring(firstNewLine + 1, lastBackticks).trim();
+                } else {
+                    result = trimmed.replace(/```/g, "").trim();
                 }
             }
         }
@@ -124,9 +131,11 @@ function revertMessage(id) {
 
 function setupUI() {
     if (!$('#cat-input-btn').length) {
-        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:12px; display:inline-flex; align-items:center; font-size:1.5em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
-        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:10px; color:#ffb4a2; font-size:1.3em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
+        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:10px; display:inline-flex; align-items:center; font-size:1.5em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
+        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:8px; color:#ffb4a2; font-size:1.3em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
+        
         $('#send_but').before(catBtn).before(revertBtn);
+        
         catBtn.on('click', async () => {
             const area = $('#send_textarea');
             if (area.val()) {
@@ -147,9 +156,9 @@ function setupUI() {
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
-                    <div class="inline-drawer-title">
+                    <div class="inline-drawer-title" style="display:flex !important; align-items:center !important; gap:8px !important; font-family:inherit;">
                         <span class="cat-emoji-icon" style="font-size:1.3em; line-height:1;">🐱</span>
-                        <span>트랜스레이터</span>
+                        <span style="font-weight:bold;">트랜스레이터</span>
                     </div>
                     <div class="inline-drawer-toggle fa-solid fa-chevron-down"></div>
                 </div>
@@ -216,7 +225,7 @@ function setupUI() {
                         <input type="number" id="ct-tokens" class="text_pole" min="0">
                     </div>
                     <div class="cat-setting-row" style="margin-top: 15px;">
-                        <button id="cat-save-btn">설정 저장 🐱</button>
+                        <button id="cat-save-btn" class="menu_button">설정 저장 🐱</button>
                     </div>
                 </div>
             </div>
