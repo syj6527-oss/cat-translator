@@ -1,6 +1,9 @@
 .cat-setting-row { margin-bottom: 12px; }
 .cat-setting-row > label { display: block; margin-bottom: 4px; font-weight: bold; opacity: 0.9; font-size: 0.9em; font-family: inherit; }
 
+/* 💡 실리태번 기본 껍데기 박스([]) 원천 차단 */
+#cat-trans-container .inline-drawer-icon { display: none !important; }
+
 /* 💡 고양이 이모지 전용 빙글빙글 애니메이션! display: inline-block이 핵심입니다. */
 .cat-spin-anim {
     display: inline-block !important;
