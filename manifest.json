@@ -1,8 +1,8 @@
 {
     "name": "cat-translator",
     "display_name": "🐱트랜스레이터",
-    "version": "4.8.0",
-    "description": "Cat Translator Pro (Error Reporting & Path Fix)",
+    "version": "4.9.0",
+    "description": "Cat Translator Pro (Real-time Error Diagnostics)",
     "author": "ST User",
     "js": "index.js",
     "css": "style.css"
