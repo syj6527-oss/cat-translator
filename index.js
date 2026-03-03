@@ -4,7 +4,7 @@ import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 const extName = "cat-translator";
 const stContext = getContext();
 
-// 💡 [v5.0.0] 번역 캐시 저장소 (메모리 로딩 방식)
+// 번역 캐시 저장소
 let translationCache = {};
 
 const defaultPrompt = 'You are a professional translator. Your goal is to translate EVERY piece of natural language text into {{language}}, NO MATTER WHERE IT IS LOCATED.\n\n[MANDATORY INSTRUCTIONS]\n1. Translate text inside code blocks (```), HTML comments (<!-- -->), and all tags (<memo>, <summary>, etc.).\n2. KEEP all structural tags and code syntax EXACTLY as they are.\n3. ONLY swap the English words for {{language}}.\n4. DO NOT skip any section.';
@@ -25,18 +25,19 @@ if (!settings.prompt || settings.prompt.trim() === "") {
     settings.prompt = defaultPrompt;
 }
 
-// 💡 설정 저장 시 캐시를 비워줍니다 (언어나 프롬프트가 바뀌면 이전 번역본은 쓸모없으므로)
 function saveSettings() {
     extension_settings[extName] = settings;
     stContext.saveSettingsDebounced();
+    // 설정 변경 시 캐시 초기화
     translationCache = {}; 
 }
 
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
-    // 💡 [v5.0.0] 토큰 아끼기 핵심: 캐시에 이미 번역본이 있다면 즉시 반환
+    // 💡 [v5.3.0] 캐시 확인 및 시각적 알림 추가
     const cacheKey = `${settings.targetLang}_${isInput ? 'toEn' : 'toTarget'}_${text}`;
     if (translationCache[cacheKey]) {
-        console.log("🐱: 캐시된 번역본을 사용합니다 (토큰 절약!)");
+        // 토큰 절약 알림 팝업 (이미 번역된 걸 또 할 때만 뜸)
+        toastr.info("🐱 캐시 사용: 토큰을 아꼈습니다!");
         return translationCache[cacheKey];
     }
 
@@ -45,7 +46,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
         ? "Translate the following text into natural English. Preserve all tags." 
         : settings.prompt.replace('{{language}}', targetLang);
 
-    const variationPrompt = previousTranslation ? `\n\n[Note: Use a different phrasing than: "${previousTranslation}"]` : "";
+    const variationPrompt = previousTranslation ? `\n\n[Alternative phrasing for: "${previousTranslation}"]` : "";
     const promptWithText = `${basePrompt}${variationPrompt}\n\n${text}`;
     const maxT = parseInt(settings.maxTokens) > 0 ? parseInt(settings.maxTokens) : null; 
 
@@ -55,7 +56,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
         if (settings.profile && stContext.ConnectionManagerRequestService) {
             const messages = [{ role: "user", content: promptWithText }];
             const response = await stContext.ConnectionManagerRequestService.sendRequest(settings.profile, messages, maxT || 4096);
-            if (!response) throw new Error("프리셋 응답이 없습니다.");
+            if (!response) throw new Error("API Response Empty");
             result = typeof response === 'string' ? response : (response.content || "");
         } 
         else {
@@ -70,7 +71,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             
             const body = {
                 contents: [{ role: "user", parts: [{ text: promptWithText }] }],
-                generationConfig: { temperature: 0.2 },
+                generationConfig: { temperature: 0.1 },
                 safetySettings: [
                     { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
                     { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
@@ -84,7 +85,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
-            }).catch(() => { throw new Error(`네트워크 오류`); });
+            });
 
             const data = await response.json();
             if (data.error) throw new Error(data.error.message);
@@ -100,7 +101,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             }
         }
 
-        // 💡 [v5.0.0] 번역 성공 시 결과를 캐시에 저장
+        // 결과 저장 (원본과 다를 때만)
         if (result && result !== text) {
             translationCache[cacheKey] = result;
         }
@@ -126,7 +127,7 @@ async function processMessage(id, isInput = false) {
     let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
     const translated = await fetchTranslation(textToTranslate, isInput, isInput ? msg.mes : msg.extra?.display_text);
     
-    const diff = Math.max(0, 500 - (Date.now() - startTime));
+    const diff = Math.max(0, 400 - (Date.now() - startTime));
     setTimeout(() => {
         if (translated && translated !== textToTranslate) {
             if (!msg.extra) msg.extra = {};
@@ -165,7 +166,7 @@ function setupUI() {
                 if (area.val() !== textAreaTranslated) textAreaOriginal = area.val();
                 const trans = await fetchTranslation(textAreaOriginal, true, textAreaTranslated);
                 
-                const diff = Math.max(0, 500 - (Date.now() - start));
+                const diff = Math.max(0, 400 - (Date.now() - start));
                 setTimeout(() => {
                     if (trans) { textAreaTranslated = trans; area.val(trans).trigger('input'); }
                     icon.removeClass('cat-spin-anim');
@@ -187,23 +188,28 @@ function setupUI() {
                 <div class="inline-drawer-content" style="display: none;">
                     <div class="cat-setting-row"><label>Connection Profile</label><select id="ct-profile" class="text_pole"><option value="">⚡ 직접 연결 모드</option>${profileOptions}</select></div>
                     <div id="direct-mode-settings" style="border-left: 2px solid #a8c7fa; padding-left: 10px; margin-bottom: 15px; display: ${settings.profile === '' ? 'block' : 'none'};">
-                        <div class="cat-setting-row"><label>직접 연결: API Key</label><input type="password" id="ct-key" class="text_pole" placeholder="직접 입력"></div>
-                        <div class="cat-setting-row"><label>직접 연결: Model</label><select id="ct-model" class="text_pole"><option value="gemini-1.5-flash">Gemini 1.5 Flash</option><option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option><option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option></select></div>
+                        <div class="cat-setting-row"><label>API Key</label><input type="password" id="ct-key" class="text_pole" placeholder="MakerSuite Key"></div>
+                        <div class="cat-setting-row"><label>Model</label><select id="ct-model" class="text_pole">
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
+                            <option value="gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro Exp</option>
+                        </select></div>
                     </div>
                     <div class="cat-setting-row"><label>Auto Mode</label><select id="ct-auto-mode" class="text_pole"><option value="none">사용 안함</option><option value="input">입력만</option><option value="output">출력만</option><option value="both">둘 다</option></select></div>
-                    <div class="cat-setting-row"><label>Target Language</label><select id="ct-lang" class="text_pole"><option value="Korean">Korean</option><option value="English">English</option><option value="Japanese">Japanese</option><option value="Spanish">Spanish</option><option value="French">French</option><option value="German">German</option><option value="Russian">Russian</option><option value="Vietnamese">Vietnamese</option></select></div>
+                    <div class="cat-setting-row"><label>Target Language</label><select id="ct-lang" class="text_pole"><option value="Korean">Korean</option><option value="English">English</option><option value="Japanese">Japanese</option></select></div>
                     <div class="cat-setting-row"><label>번역 프롬프트</label><textarea id="ct-prompt" class="text_pole" rows="4"></textarea>
                         <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;"><input type="checkbox" id="ct-filter-code"> Filter Code Block</label>
                     </div>
-                    <div class="cat-setting-row"><label>Max Tokens (0 = No limit)</label><input type="number" id="ct-tokens" class="text_pole" min="0"></div>
+                    <div class="cat-setting-row"><label>Max Tokens</label><input type="number" id="ct-tokens" class="text_pole" min="0"></div>
                     <div class="cat-setting-row" style="margin-top: 15px;"><button id="cat-save-btn" class="menu_button">설정 저장 🐱</button></div>
-                    <div style="font-size: 0.8em; opacity: 0.6; text-align: center; margin-top: 5px;">v5.0.0 "Token Saver" Active</div>
+                    <div style="font-size: 0.8em; opacity: 0.5; text-align: center; margin-top: 5px;">v5.3.0 "Visual Saver" Enabled</div>
                 </div>
             </div>
         `;
         $('#extensions_settings').append(uiHtml);
         $('#cat-trans-container .inline-drawer-header').off('click').on('click', function(e) { e.stopPropagation(); const $content = $(this).next('.inline-drawer-content'); const $toggle = $(this).find('.inline-drawer-toggle'); $content.stop().slideToggle(200); $toggle.toggleClass('fa-rotate-180'); });
-        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 설정 및 캐시가 초기화되었습니다!"); });
+        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 설정 저장 및 캐시가 초기화되었습니다!"); });
         $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); if(settings.profile === '') $('#direct-mode-settings').slideDown(); else $('#direct-mode-settings').slideUp(); saveSettings(); });
         $('#ct-key').val(settings.customKey).on('input', function() { settings.customKey = $(this).val(); saveSettings(); });
         $('#ct-model').val(settings.directModel).on('change', function() { settings.directModel = $(this).val(); saveSettings(); });
