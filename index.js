@@ -48,10 +48,19 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             const apiKey = settings.customKey || secret_state[SECRET_KEYS.MAKERSUITE];
             if (!apiKey) { toastr.error("API 키가 없습니다."); return text; }
             const model = settings.directModel.replace('models/', '');
+            
+            // 💡 검열(PROHIBITED_CONTENT) 우회를 위한 안전 설정 추가
             const body = {
                 contents: [{ role: "user", parts: [{ text: promptWithText }] }],
-                generationConfig: { temperature: 0.4 } 
+                generationConfig: { temperature: 0.4 },
+                safetySettings: [
+                    { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
+                    { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
+                    { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE" },
+                    { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" }
+                ]
             };
+            
             if (maxT) body.generationConfig.maxOutputTokens = maxT;
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
                 method: 'POST',
@@ -59,6 +68,11 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
                 body: JSON.stringify(body)
             });
             const data = await response.json();
+            
+            if (data.promptFeedback?.blockReason === 'PROHIBITED_CONTENT') {
+                return "[번역 거부: 수위가 너무 높거나 부적절한 내용이 포함되어 구글 필터에 걸렸습니다.]";
+            }
+            
             result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
         }
 
@@ -133,28 +147,28 @@ function setupUI() {
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
-                    <div class="inline-drawer-title" style="display:flex !important; align-items:center !important; gap:8px !important; font-family:inherit;">
+                    <div class="inline-drawer-title">
                         <span class="cat-emoji-icon" style="font-size:1.3em; line-height:1;">🐱</span>
-                        <span style="font-weight:bold;">트랜스레이터</span>
+                        <span>트랜스레이터</span>
                     </div>
                     <div class="inline-drawer-toggle fa-solid fa-chevron-down"></div>
                 </div>
                 <div class="inline-drawer-content" style="display: none;">
                     <div class="cat-setting-row">
-                        <label style="font-family:inherit;">Connection Profile (프리셋 연동)</label>
-                        <select id="ct-profile" class="text_pole" style="width:100%; font-family:inherit;">
+                        <label>Connection Profile (프리셋 연동)</label>
+                        <select id="ct-profile" class="text_pole">
                             <option value="">⚡ 직접 연결 모드</option>
                             ${profileOptions}
                         </select>
                     </div>
                     <div id="direct-mode-settings" style="border-left: 2px solid #a8c7fa; padding-left: 10px; margin-bottom: 15px; display: ${settings.profile === '' ? 'block' : 'none'};">
                         <div class="cat-setting-row">
-                            <label style="font-family:inherit;">직접 연결: API Key</label>
-                            <input type="password" id="ct-key" class="text_pole" placeholder="직접 입력" style="width:100%; font-family:inherit;">
+                            <label>직접 연결: API Key</label>
+                            <input type="password" id="ct-key" class="text_pole" placeholder="직접 입력">
                         </div>
                         <div class="cat-setting-row">
-                            <label style="font-family:inherit;">직접 연결: Flash Model</label>
-                            <select id="ct-model" class="text_pole" style="width:100%; font-family:inherit;">
+                            <label>직접 연결: Flash Model</label>
+                            <select id="ct-model" class="text_pole">
                                 <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                                 <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option>
                                 <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
@@ -162,8 +176,8 @@ function setupUI() {
                         </div>
                     </div>
                     <div class="cat-setting-row">
-                        <label style="font-family:inherit;">Auto Mode</label>
-                        <select id="ct-auto-mode" class="text_pole" style="width:100%; font-family:inherit;">
+                        <label>Auto Mode</label>
+                        <select id="ct-auto-mode" class="text_pole">
                             <option value="none">사용 안함</option>
                             <option value="input">입력만</option>
                             <option value="output">출력만</option>
@@ -171,8 +185,8 @@ function setupUI() {
                         </select>
                     </div>
                     <div class="cat-setting-row">
-                        <label style="font-family:inherit;">Target Language</label>
-                        <select id="ct-lang" class="text_pole" style="width:100%; font-family:inherit;">
+                        <label>Target Language</label>
+                        <select id="ct-lang" class="text_pole">
                             <option value="Korean">Korean</option>
                             <option value="English">English</option>
                             <option value="Japanese">Japanese</option>
@@ -191,33 +205,33 @@ function setupUI() {
                         </select>
                     </div>
                     <div class="cat-setting-row">
-                        <label style="font-family:inherit;">번역 프롬프트</label>
-                        <textarea id="ct-prompt" class="text_pole" rows="4" style="width:100%; font-family:inherit;"></textarea>
-                        <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8; font-family:inherit;">
+                        <label>번역 프롬프트</label>
+                        <textarea id="ct-prompt" class="text_pole" rows="4"></textarea>
+                        <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;">
                             <input type="checkbox" id="ct-filter-code"> Filter Code Block
                         </label>
                     </div>
                     <div class="cat-setting-row">
-                        <label style="font-family:inherit;">Max Tokens (0 = 무한)</label>
-                        <input type="number" id="ct-tokens" class="text_pole" min="0" style="width:100%; font-family:inherit;">
+                        <label>Max Tokens (0 = 무한)</label>
+                        <input type="number" id="ct-tokens" class="text_pole" min="0">
                     </div>
                     <div class="cat-setting-row" style="margin-top: 15px;">
-                        <button id="cat-save-btn" class="menu_button" style="width: 100%; font-family: inherit;">설정 저장 🐱</button>
+                        <button id="cat-save-btn">설정 저장 🐱</button>
                     </div>
                 </div>
             </div>
         `;
         $('#extensions_settings').append(uiHtml);
 
-        // 💡 토글 및 화살표 로직 수정
-        $('#cat-trans-container .inline-drawer-header').off('click').on('click', function() {
-            const $content = $(this).next('.inline-drawer-content');
+        $('#cat-trans-container .inline-drawer-header').off('click').on('click', function(e) {
+            e.stopPropagation();
+            const $container = $(this).closest('.inline-drawer');
+            const $content = $container.find('.inline-drawer-content');
             const $toggle = $(this).find('.inline-drawer-toggle');
             $content.stop().slideToggle(200);
             $toggle.toggleClass('fa-rotate-180');
         });
 
-        // 💡 수동 저장 버튼 이벤트
         $('#cat-save-btn').on('click', function() {
             saveSettings();
             toastr.success("🐱 설정이 성공적으로 저장되었습니다!");
