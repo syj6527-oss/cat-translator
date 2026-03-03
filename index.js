@@ -1,8 +1,8 @@
-import { extension_settings, getContext } from '../../extensions.js';
-import { secret_state, SECRET_KEYS } from '../../secrets.js';
+import { extension_settings } from '../../../extensions.js';
+import { secret_state, SECRET_KEYS } from '../../../secrets.js';
 
 const extName = "cat-translator";
-const stContext = getContext();
+const stContext = SillyTavern.getContext();
 
 const defaultSettings = {
     profile: '', 
