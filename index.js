@@ -1,8 +1,8 @@
 import { extension_settings } from '../../../extensions.js';
 import { secret_state, SECRET_KEYS } from '../../../secrets.js';
 
-// 💡 찌꺼기 없는 완전히 새로운 이름으로 회피!
-const extName = "st-cat-translator-pro"; 
+// 💡 제일 중요한 부분! 깃헙 주소(폴더명)와 완벽하게 똑같아야 합니다!
+const extName = "cat-translator"; 
 const stContext = SillyTavern.getContext();
 
 const defaultSettings = {
@@ -11,7 +11,7 @@ const defaultSettings = {
     directModel: 'gemini-1.5-flash',
     autoMode: 'none',
     targetLang: 'Korean',
-    prompt: 'Translate the following text into {{language}}. You are strictly required to translate EVERYTHING. Output EXACTLY and ONLY the translated text. No explanations.',
+    prompt: 'Translate the following text into {{language}}. You are strictly required to translate EVERYTHING including contents inside code blocks (```). \n\nCRITICAL RULE: Output EXACTLY and ONLY the translated text. ABSOLUTELY NO explanations, dictionary definitions, nuances, or conversational filler. Even if the input is a single short word, output ONLY the translated word.',
     filterCodeBlock: true,
     maxTokens: 0
 };
@@ -28,15 +28,19 @@ function saveSettings() {
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     const targetLang = isInput ? "English" : settings.targetLang;
     const basePrompt = isInput 
-        ? "Translate to English. Output ONLY the translated text." 
+        ? "Translate the following text to English. \n\nCRITICAL REQUIREMENT: Output EXACTLY and ONLY the translated text. ABSOLUTELY NO explanations, dictionary definitions, nuances, or conversational filler." 
         : settings.prompt.replace('{{language}}', targetLang);
 
-    const variationPrompt = previousTranslation ? `\n\n[CRITICAL: Provide a DIFFERENT phrasing than: "${previousTranslation}"]` : "";
+    const variationPrompt = previousTranslation 
+        ? `\n\n[CRITICAL: Provide a DIFFERENT phrasing than: "${previousTranslation}"]` 
+        : "";
+
     const promptWithText = `${basePrompt}${variationPrompt}\n\n${text}`;
 
     try {
         if (settings.profile && stContext.ConnectionManagerRequestService) {
-            const response = await stContext.ConnectionManagerRequestService.sendRequest(settings.profile, [{ role: "user", content: promptWithText }], 4096);
+            const messages = [{ role: "user", content: promptWithText }];
+            const response = await stContext.ConnectionManagerRequestService.sendRequest(settings.profile, messages, 4096);
             return typeof response === 'string' ? response : (response.content || "");
         } else {
             const apiKey = settings.customKey || secret_state[SECRET_KEYS.MAKERSUITE];
@@ -48,7 +52,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
                 body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: promptWithText }] }] })
             });
             const data = await response.json();
-            return data.candidates[0].content.parts[0].text.trim() || text;
+            return data.candidates[0].content.parts[0].text.trim();
         }
     } catch (e) { return text; }
 }
@@ -131,6 +135,9 @@ function setupUI() {
 
 jQuery(() => {
     setupUI();
+    stContext.eventSource.on(stContext.event_types.CHARACTER_MESSAGE_RENDERED, (d) => { if(['output', 'both'].includes(settings.autoMode)) processMessage(typeof d === 'object' ? d.messageId : d, false); });
+    stContext.eventSource.on(stContext.event_types.USER_MESSAGE_RENDERED, (d) => { if(['input', 'both'].includes(settings.autoMode)) processMessage(typeof d === 'object' ? d.messageId : d, true); });
+    
     $(document).on('mouseenter touchstart', '.mes', function() {
         if (!$(this).find('.flash-btn-group').length) {
             const btnGroup = $('<div class="flash-btn-group"></div>');
