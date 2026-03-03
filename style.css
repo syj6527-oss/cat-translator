@@ -1,21 +1,25 @@
 .cat-setting-row { margin-bottom: 12px; }
 .cat-setting-row > label { display: block; margin-bottom: 4px; font-weight: bold; opacity: 0.9; font-size: 0.9em; }
 
-/* 버튼 호버 액션만 남김 (투명해지는 원인 SVG 완전 삭제) */
-#cat-input-btn:hover { filter: brightness(1.5); transform: scale(1.1); transition: all 0.2s; }
-.cat-mes-trans-btn:hover { opacity: 1 !important; transition: all 0.2s; }
-.cat-mes-revert-btn:hover { opacity: 1 !important; transition: all 0.2s; }
-.cat-spin {
-    display: inline-block;
-    font-size: 18px;
-    transition: transform 0.2s ease;
+/* 💡 고양이 이모지 전용 빙글빙글 애니메이션! display: inline-block이 핵심입니다. */
+.cat-spin-anim {
+    display: inline-block !important;
+    animation: cat-emoji-spin 1.2s infinite linear !important;
 }
 
-.cat-spin.spin {
-    animation: catRotate 1s linear infinite;
+@keyframes cat-emoji-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
-@keyframes catRotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+/* 터치/마우스 호버 시 살짝 커지는 애니메이션 */
+#cat-input-btn:hover .cat-emoji-icon, 
+.cat-mes-trans-btn:hover .cat-emoji-icon { 
+    transform: scale(1.15); 
+    transition: transform 0.2s; 
+}
+.cat-mes-revert-btn:hover { 
+    opacity: 1 !important; 
+    transform: scale(1.1); 
+    transition: all 0.2s; 
 }
