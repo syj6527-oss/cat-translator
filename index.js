@@ -1,8 +1,8 @@
 import { extension_settings } from '../../../extensions.js';
 import { secret_state, SECRET_KEYS } from '../../../secrets.js';
 
-// 💡 중요: 명찰(name)과 반드시 똑같아야 함!
-const extName = "cat-translator"; 
+// 💡 찌꺼기 없는 완전히 새로운 이름으로 회피!
+const extName = "st-cat-translator-pro"; 
 const stContext = SillyTavern.getContext();
 
 const defaultSettings = {
@@ -11,7 +11,7 @@ const defaultSettings = {
     directModel: 'gemini-1.5-flash',
     autoMode: 'none',
     targetLang: 'Korean',
-    prompt: 'Translate text to {{language}}. Output ONLY translated text.',
+    prompt: 'Translate the following text into {{language}}. You are strictly required to translate EVERYTHING. Output EXACTLY and ONLY the translated text. No explanations.',
     filterCodeBlock: true,
     maxTokens: 0
 };
@@ -28,15 +28,16 @@ function saveSettings() {
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     const targetLang = isInput ? "English" : settings.targetLang;
     const basePrompt = isInput 
-        ? "Translate text to English. Output ONLY the translated text." 
+        ? "Translate to English. Output ONLY the translated text." 
         : settings.prompt.replace('{{language}}', targetLang);
-    const variationPrompt = previousTranslation ? `\n\n[DIFFERENT phrasing than: "${previousTranslation}"]` : "";
+
+    const variationPrompt = previousTranslation ? `\n\n[CRITICAL: Provide a DIFFERENT phrasing than: "${previousTranslation}"]` : "";
     const promptWithText = `${basePrompt}${variationPrompt}\n\n${text}`;
 
     try {
         if (settings.profile && stContext.ConnectionManagerRequestService) {
             const response = await stContext.ConnectionManagerRequestService.sendRequest(settings.profile, [{ role: "user", content: promptWithText }], 4096);
-            return typeof response === 'string' ? response : (response.content || text);
+            return typeof response === 'string' ? response : (response.content || "");
         } else {
             const apiKey = settings.customKey || secret_state[SECRET_KEYS.MAKERSUITE];
             if (!apiKey) return text;
@@ -56,17 +57,33 @@ async function processMessage(id, isInput = false) {
     const msgId = parseInt(id, 10); 
     const msg = stContext.chat[msgId];
     if (!msg) return;
+
     const mesBlock = $(`.mes[mesid="${msgId}"]`);
     mesBlock.find('.flash-mes-trans-btn').addClass('fa-spin');
+
     let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
     const translated = await fetchTranslation(textToTranslate, isInput, isInput ? msg.mes : msg.extra?.display_text);
+    
     if (translated && translated !== textToTranslate) {
         if (!msg.extra) msg.extra = {};
-        if (isInput) { msg.extra.original_mes = textToTranslate; msg.mes = translated; }
-        else { msg.extra.display_text = translated; }
+        if (isInput) {
+            msg.extra.original_mes = textToTranslate;
+            msg.mes = translated; 
+        } else {
+            msg.extra.display_text = translated; 
+        }
         stContext.updateMessageBlock(msgId, msg); 
     }
     mesBlock.find('.flash-mes-trans-btn').removeClass('fa-spin');
+}
+
+function revertMessage(id) {
+    const msgId = parseInt(id, 10);
+    const msg = stContext.chat[msgId];
+    if (!msg) return;
+    if (msg.extra?.display_text) delete msg.extra.display_text;
+    if (msg.extra?.original_mes) { msg.mes = msg.extra.original_mes; delete msg.extra.original_mes; }
+    stContext.updateMessageBlock(msgId, msg);
 }
 
 function setupUI() {
@@ -74,6 +91,7 @@ function setupUI() {
         const catBtn = $('<div id="flash-input-cat-btn" title="번역하기"><span class="custom-cat-icon"></span></div>');
         const revertBtn = $('<div id="flash-input-revert-icon" class="fa-solid fa-rotate-left" title="원문 되돌리기"></div>');
         $('#send_but').before(catBtn).before(revertBtn);
+        
         catBtn.on('click', async () => {
             const area = $('#send_textarea');
             if (area.val()) {
@@ -94,8 +112,10 @@ function setupUI() {
             <div id="flash-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
                     <div class="inline-drawer-title" style="display:flex; align-items:center; gap:10px;">
-                        <span class="custom-cat-icon" style="opacity:1;"></span><span>🐱트랜스레이터</span>
+                        <span class="custom-cat-icon" style="opacity:1;"></span>
+                        <span>🐱트랜스레이터</span>
                     </div>
+                    <div class="inline-drawer-toggle fa-solid fa-chevron-down"></div>
                 </div>
                 <div class="inline-drawer-content" style="display: none;">
                     <div class="flash-setting-row"><label>Connection Profile</label><select id="ft-profile" class="text_pole"><option value="">⚡ 직접 연결</option>${profileOptions}</select></div>
@@ -114,18 +134,12 @@ jQuery(() => {
     $(document).on('mouseenter touchstart', '.mes', function() {
         if (!$(this).find('.flash-btn-group').length) {
             const btnGroup = $('<div class="flash-btn-group"></div>');
-            const transBtn = $('<div class="flash-mes-trans-btn"><span class="custom-cat-icon"></span></div>');
-            const revertBtn = $('<div class="flash-mes-revert-btn fa-solid fa-rotate-left"></div>');
+            const transBtn = $('<div class="flash-mes-trans-btn" title="번역"><span class="custom-cat-icon"></span></div>');
+            const revertBtn = $('<div class="flash-mes-revert-btn fa-solid fa-rotate-left" title="되돌리기"></div>');
             btnGroup.append(transBtn).append(revertBtn);
             $(this).find('.name_text').append(btnGroup);
             transBtn.on('click', () => processMessage($(this).attr('mesid'), $(this).closest('.mes').hasClass('mes_user')));
-            revertBtn.on('click', () => {
-                const msgId = $(this).attr('mesid');
-                const msg = stContext.chat[msgId];
-                if (msg.extra?.display_text) delete msg.extra.display_text;
-                if (msg.extra?.original_mes) { msg.mes = msg.extra.original_mes; delete msg.extra.original_mes; }
-                stContext.updateMessageBlock(msgId, msg);
-            });
+            revertBtn.on('click', () => revertMessage($(this).attr('mesid')));
         }
     });
 });
