@@ -1,7 +1,7 @@
 {
-    "name": "cat-translator",
-    "display_name": "Cat Translator",
+    "name": "st-magic-translator-pro",
+    "display_name": "🐱트랜스레이터",
     "version": "2.2.0",
-    "description": "Custom translator for SillyTavern",
+    "description": "Cat Translator Pro",
     "author": "ST User"
 }
