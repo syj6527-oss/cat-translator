@@ -1,9 +1,8 @@
-import { extension_settings } from '../../../extensions.js';
-import { secret_state, SECRET_KEYS } from '../../../secrets.js';
+import { extension_settings, getContext } from '../../extensions.js';
+import { secret_state, SECRET_KEYS } from '../../secrets.js';
 
-// 💡 제일 중요한 부분! 깃헙 주소(폴더명)와 완벽하게 똑같아야 합니다!
-const extName = "cat-translator"; 
-const stContext = SillyTavern.getContext();
+const extName = "cat-translator";
+const stContext = getContext();
 
 const defaultSettings = {
     profile: '', 
