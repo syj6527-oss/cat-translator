@@ -289,7 +289,9 @@ jQuery(() => {
     $(document).on('mouseenter touchstart', '.mes', function() {
         if (!$(this).find('.cat-btn-group').length) {
             const btnGroup = $('<div class="cat-btn-group" style="display:inline-flex; gap:10px; margin-left:10px; align-items:center;"></div>');
-            const transBtn = $('<div class="cat-mes-trans-btn" title="고양이 번역하기" style="cursor:pointer;"><span class="custom-cat-icon" style="opacity:0.4;"></span></div>');
+            const transBtn = $(
+  '<div class="cat-mes-trans-btn cat-spin" title="고양이 번역하기" style="cursor:pointer;">🐱</div>'
+);
             const revertBtn = $('<div class="cat-mes-revert-btn fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; color:#ffb4a2; opacity:0.4;"></div>');
 
             btnGroup.append(transBtn).append(revertBtn);
