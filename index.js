@@ -4,6 +4,9 @@ import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 const extName = "cat-translator";
 const stContext = getContext();
 
+// 💡 [v5.0.0] 번역 캐시 저장소 (메모리 로딩 방식)
+let translationCache = {};
+
 const defaultPrompt = 'You are a professional translator. Your goal is to translate EVERY piece of natural language text into {{language}}, NO MATTER WHERE IT IS LOCATED.\n\n[MANDATORY INSTRUCTIONS]\n1. Translate text inside code blocks (```), HTML comments (<!-- -->), and all tags (<memo>, <summary>, etc.).\n2. KEEP all structural tags and code syntax EXACTLY as they are.\n3. ONLY swap the English words for {{language}}.\n4. DO NOT skip any section.';
 
 const defaultSettings = {
@@ -22,15 +25,21 @@ if (!settings.prompt || settings.prompt.trim() === "") {
     settings.prompt = defaultPrompt;
 }
 
-let textAreaOriginal = "";
-let textAreaTranslated = "";
-
+// 💡 설정 저장 시 캐시를 비워줍니다 (언어나 프롬프트가 바뀌면 이전 번역본은 쓸모없으므로)
 function saveSettings() {
     extension_settings[extName] = settings;
     stContext.saveSettingsDebounced();
+    translationCache = {}; 
 }
 
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
+    // 💡 [v5.0.0] 토큰 아끼기 핵심: 캐시에 이미 번역본이 있다면 즉시 반환
+    const cacheKey = `${settings.targetLang}_${isInput ? 'toEn' : 'toTarget'}_${text}`;
+    if (translationCache[cacheKey]) {
+        console.log("🐱: 캐시된 번역본을 사용합니다 (토큰 절약!)");
+        return translationCache[cacheKey];
+    }
+
     const targetLang = isInput ? "English" : settings.targetLang;
     const basePrompt = isInput 
         ? "Translate the following text into natural English. Preserve all tags." 
@@ -46,13 +55,13 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
         if (settings.profile && stContext.ConnectionManagerRequestService) {
             const messages = [{ role: "user", content: promptWithText }];
             const response = await stContext.ConnectionManagerRequestService.sendRequest(settings.profile, messages, maxT || 4096);
-            if (!response) throw new Error("프리셋 응답이 없습니다. 설정을 확인하세요.");
+            if (!response) throw new Error("프리셋 응답이 없습니다.");
             result = typeof response === 'string' ? response : (response.content || "");
         } 
         else {
             const apiKey = settings.customKey || secret_state[SECRET_KEYS.MAKERSUITE];
             if (!apiKey) {
-                toastr.error("🐱: API 키가 없습니다! 열쇠 아이콘 메뉴에서 Google MakerSuite 키를 넣으거나 설정에 직접 입력해 주세요.");
+                toastr.error("🐱: API 키가 없습니다!");
                 return text;
             }
             
@@ -75,25 +84,10 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
-            }).catch(err => {
-                throw new Error(`네트워크 오류: 구글 서버에 접속할 수 없습니다. (VPN/광고차단 확인)`);
-            });
+            }).catch(() => { throw new Error(`네트워크 오류`); });
 
             const data = await response.json();
-            
-            if (data.error) {
-                const code = data.error.code || "Error";
-                const msg = data.error.message || "Unknown error";
-                if (code === 403) toastr.error(`🐱 API 키 권한 오류! 키가 올바른지 확인하세요.`);
-                else if (code === 429) toastr.error(`🐱 너무 자주 눌렀습니다! 잠시 후 시도하세요.`);
-                else toastr.error(`🐱 구글 에러(${code}): ${msg}`);
-                throw new Error(msg);
-            }
-            
-            if (data.promptFeedback?.blockReason) {
-                toastr.warning(`🐱 구글 검열에 걸렸습니다: ${data.promptFeedback.blockReason}`);
-                return `[번역 거부: ${data.promptFeedback.blockReason}]`;
-            }
+            if (data.error) throw new Error(data.error.message);
             
             result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
         }
@@ -105,6 +99,12 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
                 if (lines.length > 2) result = lines.slice(1, -1).join('\n').trim();
             }
         }
+
+        // 💡 [v5.0.0] 번역 성공 시 결과를 캐시에 저장
+        if (result && result !== text) {
+            translationCache[cacheKey] = result;
+        }
+
         return result || text;
     } catch (e) {
         console.error("[Cat Translator Error]", e);
@@ -120,16 +120,13 @@ async function processMessage(id, isInput = false) {
     const mesBlock = $(`.mes[mesid="${msgId}"]`);
     const btnIcon = mesBlock.find('.cat-emoji-icon');
     
-    // 💡 [v4.9.0] 고양이가 도는 걸 유저가 인지할 수 있게 최소 0.5초는 돌게 함
     btnIcon.addClass('cat-spin-anim');
     const startTime = Date.now();
 
     let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
     const translated = await fetchTranslation(textToTranslate, isInput, isInput ? msg.mes : msg.extra?.display_text);
     
-    const elapsedTime = Date.now() - startTime;
-    const waitTime = Math.max(0, 500 - elapsedTime);
-
+    const diff = Math.max(0, 500 - (Date.now() - startTime));
     setTimeout(() => {
         if (translated && translated !== textToTranslate) {
             if (!msg.extra) msg.extra = {};
@@ -138,7 +135,7 @@ async function processMessage(id, isInput = false) {
             stContext.updateMessageBlock(msgId, msg); 
         }
         btnIcon.removeClass('cat-spin-anim');
-    }, waitTime);
+    }, diff);
 }
 
 function revertMessage(id) {
@@ -198,14 +195,15 @@ function setupUI() {
                     <div class="cat-setting-row"><label>번역 프롬프트</label><textarea id="ct-prompt" class="text_pole" rows="4"></textarea>
                         <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;"><input type="checkbox" id="ct-filter-code"> Filter Code Block</label>
                     </div>
-                    <div class="cat-setting-row"><label>Max Tokens</label><input type="number" id="ct-tokens" class="text_pole" min="0"></div>
+                    <div class="cat-setting-row"><label>Max Tokens (0 = No limit)</label><input type="number" id="ct-tokens" class="text_pole" min="0"></div>
                     <div class="cat-setting-row" style="margin-top: 15px;"><button id="cat-save-btn" class="menu_button">설정 저장 🐱</button></div>
+                    <div style="font-size: 0.8em; opacity: 0.6; text-align: center; margin-top: 5px;">v5.0.0 "Token Saver" Active</div>
                 </div>
             </div>
         `;
         $('#extensions_settings').append(uiHtml);
         $('#cat-trans-container .inline-drawer-header').off('click').on('click', function(e) { e.stopPropagation(); const $content = $(this).next('.inline-drawer-content'); const $toggle = $(this).find('.inline-drawer-toggle'); $content.stop().slideToggle(200); $toggle.toggleClass('fa-rotate-180'); });
-        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 설정이 저장되었습니다! 🐾"); });
+        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 설정 및 캐시가 초기화되었습니다!"); });
         $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); if(settings.profile === '') $('#direct-mode-settings').slideDown(); else $('#direct-mode-settings').slideUp(); saveSettings(); });
         $('#ct-key').val(settings.customKey).on('input', function() { settings.customKey = $(this).val(); saveSettings(); });
         $('#ct-model').val(settings.directModel).on('change', function() { settings.directModel = $(this).val(); saveSettings(); });
