@@ -109,7 +109,6 @@ function revertMessage(id) {
 
 function setupUI() {
     if (!$('#cat-input-btn').length) {
-        // 입력창 고양이 크기 확대 (1.5em)
         const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:12px; display:inline-flex; align-items:center; font-size:1.5em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
         const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:10px; color:#ffb4a2; font-size:1.3em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
         $('#send_but').before(catBtn).before(revertBtn);
@@ -130,7 +129,6 @@ function setupUI() {
         let profileOptions = '';
         (stContext.extensionSettings?.connectionManager?.profiles || []).forEach(p => { profileOptions += `<option value="${p.id}">${p.name}</option>`; });
 
-        // 💡 설정창 제목 옆에 🐱 고양이 아이콘 부활 및 폰트 통일
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
@@ -206,6 +204,15 @@ function setupUI() {
             </div>
         `;
         $('#extensions_settings').append(uiHtml);
+
+        // 💡 토글 동기화: 헤더 클릭 시 화살표 회전 클래스 추가/제거
+        $('#cat-trans-container .inline-drawer-header').on('click', function() {
+            const content = $(this).siblings('.inline-drawer-content');
+            const toggle = $(this).find('.inline-drawer-toggle');
+            content.slideToggle(200);
+            toggle.toggleClass('fa-rotate-180'); // 실리태번 순정 회전 방식 적용
+        });
+
         $('#ct-profile').val(settings.profile).on('change', function() { 
             settings.profile = $(this).val(); 
             if(settings.profile === '') $('#direct-mode-settings').slideDown();
@@ -235,7 +242,6 @@ jQuery(() => {
     $(document).on('mouseenter touchstart', '.mes', function() {
         if (!$(this).find('.cat-btn-group').length) {
             const btnGroup = $('<div class="cat-btn-group" style="display:inline-flex; gap:12px; margin-left:10px; align-items:center;"></div>');
-            // 채팅창 고양이 크기 확대 (1.6em)
             const transBtn = $('<div class="cat-mes-trans-btn" title="고양이 번역하기" style="cursor:pointer; opacity:0.6; font-size:1.6em; line-height:1;"><span class="cat-emoji-icon" style="display:inline-block;">🐱</span></div>');
             const revertBtn = $('<div class="cat-mes-revert-btn fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; color:#ffb4a2; opacity:0.6; font-size:1.1em; margin-bottom: 2px;"></div>');
             btnGroup.append(transBtn).append(revertBtn);
