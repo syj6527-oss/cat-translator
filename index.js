@@ -93,7 +93,6 @@ async function processMessage(id, isInput = false) {
     if (!msg) return;
 
     const mesBlock = $(`.mes[mesid="${msgId}"]`);
-    // 💡 번역 시작 시 빙글빙글 도는 클래스 추가
     const btnIcon = mesBlock.find('.cat-mes-trans-btn .cat-emoji-icon');
     btnIcon.addClass('cat-spin-anim');
 
@@ -125,7 +124,6 @@ async function processMessage(id, isInput = false) {
         stContext.updateMessageBlock(msgId, msg); 
     }
     
-    // 💡 번역 완료 시 회전 종료
     btnIcon.removeClass('cat-spin-anim');
 }
 
@@ -150,11 +148,10 @@ function revertMessage(id) {
 }
 
 function setupUI() {
-    // 1. 입력창 버튼
+    // 💡 1. 입력창 버튼 (크기 확대, 정렬 교정)
     if (!$('#cat-input-btn').length) {
-        // 크기 조절 (1.1em) 및 정렬
-        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:8px; display:inline-flex; align-items:center;"><span class="cat-emoji-icon" style="font-size:1.1em;">🐱</span></div>');
-        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:10px; color:#ffb4a2; font-size:1.2em; opacity:0.6; transition:all 0.2s;"></div>');
+        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:12px; display:inline-flex; align-items:center; font-size:1.5em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
+        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:10px; color:#ffb4a2; font-size:1.3em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
         
         $('#send_but').before(catBtn).before(revertBtn);
         
@@ -194,38 +191,35 @@ function setupUI() {
         });
     }
 
-    // 2. 확장 설정창 UI
+    // 💡 2. 설정창 UI (언어 대폭 추가 및 폰트 통일)
     if (!$('#cat-trans-container').length) {
         let profileOptions = '';
         const profiles = stContext.extensionSettings?.connectionManager?.profiles || [];
         profiles.forEach(p => { profileOptions += `<option value="${p.id}">${p.name}</option>`; });
 
-        // 💡 엑스박스 뜨던 빈 껍데기(inline-drawer-icon) 완전 삭제! 고양이와 글씨를 찰싹 붙여서 통일감 줌
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
-                    <div class="inline-drawer-title" style="display:flex; align-items:center; gap:6px;">
-                        <span class="cat-emoji-icon" style="font-size:1em;">🐱</span>
-                        <span>트랜스레이터</span>
-                    </div>
+                    <div class="inline-drawer-icon" style="display:flex; align-items:center; justify-content:center; font-size:1.2em; line-height:1;"><span class="cat-emoji-icon">🐱</span></div>
+                    <div class="inline-drawer-title" style="font-family:inherit;">트랜스레이터</div>
                     <div class="inline-drawer-toggle fa-solid fa-chevron-down"></div>
                 </div>
                 <div class="inline-drawer-content" style="display: none;">
                     <div class="cat-setting-row" style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; font-size:0.9em;">Connection Profile (프리셋 연동)</label>
-                        <select id="ct-profile" class="text_pole" style="width:100%;">
+                        <label style="display:block; font-weight:bold; font-size:0.9em; font-family:inherit;">Connection Profile (프리셋 연동)</label>
+                        <select id="ct-profile" class="text_pole" style="width:100%; font-family:inherit;">
                             <option value="">⚡ 직접 연결 모드 (아래 설정 사용)</option>
                             ${profileOptions}
                         </select>
                     </div>
                     <div id="direct-mode-settings" style="border-left: 2px solid #a8c7fa; padding-left: 10px; margin-bottom: 15px; display: ${settings.profile === '' ? 'block' : 'none'};">
                         <div class="cat-setting-row" style="margin-bottom:12px;">
-                            <label style="display:block; font-weight:bold; font-size:0.9em;">직접 연결: API Key</label>
-                            <input type="password" id="ct-key" class="text_pole" placeholder="직접 입력 (선택사항)" style="width:100%;">
+                            <label style="display:block; font-weight:bold; font-size:0.9em; font-family:inherit;">직접 연결: API Key</label>
+                            <input type="password" id="ct-key" class="text_pole" placeholder="직접 입력 (선택사항)" style="width:100%; font-family:inherit;">
                         </div>
                         <div class="cat-setting-row" style="margin-bottom:12px;">
-                            <label style="display:block; font-weight:bold; font-size:0.9em;">직접 연결: Flash Model</label>
-                            <select id="ct-model" class="text_pole" style="width:100%;">
+                            <label style="display:block; font-weight:bold; font-size:0.9em; font-family:inherit;">직접 연결: Flash Model</label>
+                            <select id="ct-model" class="text_pole" style="width:100%; font-family:inherit;">
                                 <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                                 <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option>
                                 <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
@@ -233,8 +227,8 @@ function setupUI() {
                         </div>
                     </div>
                     <div class="cat-setting-row" style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; font-size:0.9em;">Auto Mode</label>
-                        <select id="ct-auto-mode" class="text_pole" style="width:100%;">
+                        <label style="display:block; font-weight:bold; font-size:0.9em; font-family:inherit;">Auto Mode</label>
+                        <select id="ct-auto-mode" class="text_pole" style="width:100%; font-family:inherit;">
                             <option value="none">사용 안함</option>
                             <option value="input">입력만</option>
                             <option value="output">출력만</option>
@@ -242,23 +236,35 @@ function setupUI() {
                         </select>
                     </div>
                     <div class="cat-setting-row" style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; font-size:0.9em;">Target Language</label>
-                        <select id="ct-lang" class="text_pole" style="width:100%;">
+                        <label style="display:block; font-weight:bold; font-size:0.9em; font-family:inherit;">Target Language</label>
+                        <select id="ct-lang" class="text_pole" style="width:100%; font-family:inherit;">
                             <option value="Korean">Korean</option>
                             <option value="English">English</option>
                             <option value="Japanese">Japanese</option>
+                            <option value="Chinese (Simplified)">Chinese (Simplified)</option>
+                            <option value="Chinese (Traditional)">Chinese (Traditional)</option>
+                            <option value="Spanish">Spanish</option>
+                            <option value="French">French</option>
+                            <option value="German">German</option>
+                            <option value="Russian">Russian</option>
+                            <option value="Italian">Italian</option>
+                            <option value="Portuguese">Portuguese</option>
+                            <option value="Vietnamese">Vietnamese</option>
+                            <option value="Thai">Thai</option>
+                            <option value="Indonesian">Indonesian</option>
+                            <option value="Arabic">Arabic</option>
                         </select>
                     </div>
                     <div class="cat-setting-row" style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; font-size:0.9em;">번역 프롬프트</label>
-                        <textarea id="ct-prompt" class="text_pole" rows="4" style="width:100%;"></textarea>
-                        <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;">
+                        <label style="display:block; font-weight:bold; font-size:0.9em; font-family:inherit;">번역 프롬프트</label>
+                        <textarea id="ct-prompt" class="text_pole" rows="4" style="width:100%; font-family:inherit;"></textarea>
+                        <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8; font-family:inherit;">
                             <input type="checkbox" id="ct-filter-code"> Filter Code Block
                         </label>
                     </div>
                     <div class="cat-setting-row" style="margin-bottom:12px;">
-                        <label style="display:block; font-weight:bold; font-size:0.9em;">Max Tokens (0 = 무한)</label>
-                        <input type="number" id="ct-tokens" class="text_pole" min="0" style="width:100%;">
+                        <label style="display:block; font-weight:bold; font-size:0.9em; font-family:inherit;">Max Tokens (0 = 무한)</label>
+                        <input type="number" id="ct-tokens" class="text_pole" min="0" style="width:100%; font-family:inherit;">
                     </div>
                 </div>
             </div>
@@ -294,13 +300,12 @@ jQuery(() => {
         if(['input', 'both'].includes(settings.autoMode)) processMessage(msgId, true); 
     });
     
-    // 3. 채팅창 말풍선 버튼
+    // 💡 3. 채팅창 말풍선 버튼 (고양이 아이콘 크기를 확실하게 키움)
     $(document).on('mouseenter touchstart', '.mes', function() {
         if (!$(this).find('.cat-btn-group').length) {
             const btnGroup = $('<div class="cat-btn-group" style="display:inline-flex; gap:12px; margin-left:10px; align-items:center;"></div>');
-            // 크기 조절 (1em)
-            const transBtn = $('<div class="cat-mes-trans-btn" title="고양이 번역하기" style="cursor:pointer; opacity:0.6; display:flex; align-items:center;"><span class="cat-emoji-icon" style="font-size:1em;">🐱</span></div>');
-            const revertBtn = $('<div class="cat-mes-revert-btn fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; color:#ffb4a2; opacity:0.6; font-size:1em;"></div>');
+            const transBtn = $('<div class="cat-mes-trans-btn" title="고양이 번역하기" style="cursor:pointer; opacity:0.6; font-size:1.4em; line-height:1;"><span class="cat-emoji-icon" style="display:inline-block;">🐱</span></div>');
+            const revertBtn = $('<div class="cat-mes-revert-btn fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; color:#ffb4a2; opacity:0.6; font-size:1.1em; margin-bottom: 2px;"></div>');
 
             btnGroup.append(transBtn).append(revertBtn);
             $(this).find('.name_text').append(btnGroup);
