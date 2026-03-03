@@ -1,9 +1,9 @@
 {
-  "name": "cat-translator",
-  "display_name": "🐱 트랜스레이터",
-  "version": "2.0.0",
-  "description": "Cat Translator Pro",
-  "author": "ST User",
-  "js": "index.js",
-  "css": "style.css"
+    "name": "cat-translator",
+    "display_name": "🐱트랜스레이터",
+    "version": "2.5.0",
+    "description": "Professional Cat Translator with Variation and Revert features",
+    "author": "ST User",
+    "js": "index.js",
+    "css": "style.css"
 }
