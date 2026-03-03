@@ -93,6 +93,7 @@ async function processMessage(id, isInput = false) {
     if (!msg) return;
 
     const mesBlock = $(`.mes[mesid="${msgId}"]`);
+    // 💡 번역 시작 시 빙글빙글 도는 클래스 추가
     const btnIcon = mesBlock.find('.cat-mes-trans-btn .cat-emoji-icon');
     btnIcon.addClass('cat-spin-anim');
 
@@ -124,6 +125,7 @@ async function processMessage(id, isInput = false) {
         stContext.updateMessageBlock(msgId, msg); 
     }
     
+    // 💡 번역 완료 시 회전 종료
     btnIcon.removeClass('cat-spin-anim');
 }
 
@@ -148,8 +150,10 @@ function revertMessage(id) {
 }
 
 function setupUI() {
+    // 1. 입력창 버튼
     if (!$('#cat-input-btn').length) {
-        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:12px; display:inline-flex; align-items:center; font-size:1.3em;"><span class="cat-emoji-icon" style="display:inline-block;">🐱</span></div>');
+        // 크기 조절 (1.1em) 및 정렬
+        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:8px; display:inline-flex; align-items:center;"><span class="cat-emoji-icon" style="font-size:1.1em;">🐱</span></div>');
         const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:10px; color:#ffb4a2; font-size:1.2em; opacity:0.6; transition:all 0.2s;"></div>');
         
         $('#send_but').before(catBtn).before(revertBtn);
@@ -190,16 +194,20 @@ function setupUI() {
         });
     }
 
+    // 2. 확장 설정창 UI
     if (!$('#cat-trans-container').length) {
         let profileOptions = '';
         const profiles = stContext.extensionSettings?.connectionManager?.profiles || [];
         profiles.forEach(p => { profileOptions += `<option value="${p.id}">${p.name}</option>`; });
 
+        // 💡 엑스박스 뜨던 빈 껍데기(inline-drawer-icon) 완전 삭제! 고양이와 글씨를 찰싹 붙여서 통일감 줌
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
-                    <div class="inline-drawer-icon"><span class="cat-emoji-icon" style="display:inline-block; font-size:1.2em;">🐱</span></div>
-                    <div class="inline-drawer-title">트랜스레이터</div>
+                    <div class="inline-drawer-title" style="display:flex; align-items:center; gap:6px;">
+                        <span class="cat-emoji-icon" style="font-size:1em;">🐱</span>
+                        <span>트랜스레이터</span>
+                    </div>
                     <div class="inline-drawer-toggle fa-solid fa-chevron-down"></div>
                 </div>
                 <div class="inline-drawer-content" style="display: none;">
@@ -286,11 +294,13 @@ jQuery(() => {
         if(['input', 'both'].includes(settings.autoMode)) processMessage(msgId, true); 
     });
     
+    // 3. 채팅창 말풍선 버튼
     $(document).on('mouseenter touchstart', '.mes', function() {
         if (!$(this).find('.cat-btn-group').length) {
             const btnGroup = $('<div class="cat-btn-group" style="display:inline-flex; gap:12px; margin-left:10px; align-items:center;"></div>');
-            const transBtn = $('<div class="cat-mes-trans-btn" title="고양이 번역하기" style="cursor:pointer; opacity:0.6; font-size:1.2em;"><span class="cat-emoji-icon" style="display:inline-block;">🐱</span></div>');
-            const revertBtn = $('<div class="cat-mes-revert-btn fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; color:#ffb4a2; opacity:0.6; font-size:1.1em;"></div>');
+            // 크기 조절 (1em)
+            const transBtn = $('<div class="cat-mes-trans-btn" title="고양이 번역하기" style="cursor:pointer; opacity:0.6; display:flex; align-items:center;"><span class="cat-emoji-icon" style="font-size:1em;">🐱</span></div>');
+            const revertBtn = $('<div class="cat-mes-revert-btn fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; color:#ffb4a2; opacity:0.6; font-size:1em;"></div>');
 
             btnGroup.append(transBtn).append(revertBtn);
             $(this).find('.name_text').append(btnGroup);
