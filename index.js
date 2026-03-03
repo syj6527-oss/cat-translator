@@ -4,7 +4,6 @@ import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 const extName = "cat-translator";
 const stContext = getContext();
 
-// 💡 기본 설정값
 const defaultSettings = {
     profile: '', 
     customKey: '',
@@ -16,13 +15,11 @@ const defaultSettings = {
     maxTokens: 0
 };
 
-// 💡 저장된 설정 불러오기 (기본값과 병합하여 유실 방지)
 let settings = Object.assign({}, defaultSettings, extension_settings[extName]);
 
 let textAreaOriginal = "";
 let textAreaTranslated = "";
 
-// 💡 실리태번 서버에 설정을 영구 저장하는 핵심 함수
 function saveSettings() {
     extension_settings[extName] = settings;
     stContext.saveSettingsDebounced();
@@ -35,7 +32,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
         : settings.prompt.replace('{{language}}', targetLang);
 
     const variationPrompt = previousTranslation 
-        ? `\n\n[CRITICAL: Provide a DIFFERENT phrasing than "${previousTranslation}".]` 
+        ? `\n\n[CRITICAL INSTRUCTION: Provide a DIFFERENT phrasing than "${previousTranslation}".]` 
         : "";
 
     const promptWithText = `${basePrompt}${variationPrompt}\n\n${text}`;
@@ -113,7 +110,6 @@ function revertMessage(id) {
 
 function setupUI() {
     if (!$('#cat-input-btn').length) {
-        // 💡 입력창 고양이 크기 (1.5em)
         const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:12px; display:inline-flex; align-items:center; font-size:1.5em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
         const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:10px; color:#ffb4a2; font-size:1.3em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
         $('#send_but').before(catBtn).before(revertBtn);
@@ -137,7 +133,7 @@ function setupUI() {
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
-                    <div class="inline-drawer-title" style="display:flex; align-items:center; gap:8px; font-family:inherit;">
+                    <div class="inline-drawer-title" style="display:flex !important; align-items:center !important; gap:8px !important; font-family:inherit;">
                         <span class="cat-emoji-icon" style="font-size:1.3em; line-height:1;">🐱</span>
                         <span style="font-weight:bold;">트랜스레이터</span>
                     </div>
@@ -205,12 +201,15 @@ function setupUI() {
                         <label style="font-family:inherit;">Max Tokens (0 = 무한)</label>
                         <input type="number" id="ct-tokens" class="text_pole" min="0" style="width:100%; font-family:inherit;">
                     </div>
+                    <div class="cat-setting-row" style="margin-top: 15px;">
+                        <button id="cat-save-btn" class="menu_button" style="width: 100%; font-family: inherit;">설정 저장 🐱</button>
+                    </div>
                 </div>
             </div>
         `;
         $('#extensions_settings').append(uiHtml);
 
-        // 💡 토글 수정: 클릭 시 화살표 회전과 내용 열기를 동시에 수행
+        // 💡 토글 및 화살표 로직 수정
         $('#cat-trans-container .inline-drawer-header').off('click').on('click', function() {
             const $content = $(this).next('.inline-drawer-content');
             const $toggle = $(this).find('.inline-drawer-toggle');
@@ -218,7 +217,12 @@ function setupUI() {
             $toggle.toggleClass('fa-rotate-180');
         });
 
-        // 💡 모든 설정 필드에 저장 로직 연결
+        // 💡 수동 저장 버튼 이벤트
+        $('#cat-save-btn').on('click', function() {
+            saveSettings();
+            toastr.success("🐱 설정이 성공적으로 저장되었습니다!");
+        });
+
         $('#ct-profile').val(settings.profile).on('change', function() { 
             settings.profile = $(this).val(); 
             if(settings.profile === '') $('#direct-mode-settings').slideDown();
@@ -248,7 +252,6 @@ jQuery(() => {
     $(document).on('mouseenter touchstart', '.mes', function() {
         if (!$(this).find('.cat-btn-group').length) {
             const btnGroup = $('<div class="cat-btn-group" style="display:inline-flex; gap:12px; margin-left:10px; align-items:center;"></div>');
-            // 💡 채팅창 고양이 크기 확대 (1.6em)
             const transBtn = $('<div class="cat-mes-trans-btn" title="고양이 번역하기" style="cursor:pointer; opacity:0.6; font-size:1.6em; line-height:1;"><span class="cat-emoji-icon" style="display:inline-block;">🐱</span></div>');
             const revertBtn = $('<div class="cat-mes-revert-btn fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; color:#ffb4a2; opacity:0.6; font-size:1.1em; margin-bottom: 2px;"></div>');
             btnGroup.append(transBtn).append(revertBtn);
