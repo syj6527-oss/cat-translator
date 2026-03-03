@@ -1,7 +1,7 @@
 .flash-setting-row { margin-bottom: 12px; }
 .flash-setting-row > label { display: block; margin-bottom: 4px; font-weight: bold; opacity: 0.9; font-size: 0.9em; }
 
-/* 🐱 커스텀 고양이 아이콘 디자인 */
+/* 🐱 커스텀 고양이 아이콘 디자인 (모노톤 & 크기 최적화) */
 .custom-cat-icon {
     display: inline-block;
     width: 1.2em;
@@ -15,19 +15,19 @@
     opacity: 0.5;
 }
 
-/* 입력창 고양이 & 되돌리기 */
+/* 입력창 고양이 & 되돌리기 버튼 */
 #flash-input-cat-btn { cursor: pointer; margin-right: 8px; display: inline-flex; align-items: center; }
 #flash-input-cat-btn:hover .custom-cat-icon { opacity: 1; filter: brightness(1.5); transform: scale(1.1); }
 #flash-input-revert-icon { cursor: pointer; margin-right: 10px; color: #ffb4a2; font-size: 1.2em; transition: all 0.2s; opacity: 0.6; }
 #flash-input-revert-icon:hover { opacity: 1; transform: scale(1.1); }
 
-/* 채팅창 버튼 그룹 */
+/* 채팅창 이름 옆 버튼 그룹 */
 .flash-btn-group { display: inline-flex; gap: 10px; margin-left: 10px; vertical-align: middle; align-items: center; }
 .flash-mes-trans-btn, .flash-mes-revert-btn { cursor: pointer; transition: all 0.2s; display: flex; align-items: center; }
 .flash-mes-trans-btn .custom-cat-icon { opacity: 0.4; }
-.flash-mes-trans-btn:hover .custom-cat-icon { opacity: 1; filter: brightness(1.5); }
-.flash-mes-revert-btn { color: #ffb4a2; font-size: 0.9em; opacity: 0.4; }
-.flash-mes-revert-btn:hover { opacity: 1; color: #fff; }
+.flash-mes-trans-btn:hover .custom-cat-icon { opacity: 1; filter: brightness(1.5); transform: scale(1.1); }
+.flash-mes-revert-btn { color: #ffb4a2; font-size: 1.1em; opacity: 0.4; margin-top: 2px; }
+.flash-mes-revert-btn:hover { opacity: 1; color: #fff; transform: scale(1.1); }
 
-/* 로딩 애니메이션 */
+/* 로딩 빙글빙글 애니메이션 */
 .fa-spin { animation: fa-spin 2s infinite linear; }
