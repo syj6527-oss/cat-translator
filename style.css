@@ -1,59 +1,78 @@
 .cat-setting-row { margin-bottom: 12px; }
 .cat-setting-row > label { display: block; margin-bottom: 4px; font-weight: bold; opacity: 0.9; font-size: 0.9em; font-family: inherit; }
 
-/* 💡 실리태번 기본 껍데기 박스([]) 원천 차단 */
-#cat-trans-container .inline-drawer-icon { display: none !important; }
+/* 💡 [v4.3.0] 빈 박스([]) 원천 차단 - 최상위 선택자 */
+div[id="cat-trans-container"] .inline-drawer-icon,
+#cat-trans-container .inline-drawer-icon { 
+    display: none !important; 
+    width: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
 
-/* 💡 헤더 레이아웃: 제목은 왼쪽, 화살표는 오른쪽 끝으로 완벽 동기화 */
+/* 헤더 레이아웃 */
 #cat-trans-container .inline-drawer-header {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     cursor: pointer !important;
-    padding: 10px !important;
+    padding: 0.5em 0.8em !important;
+    min-height: 3em !important;
 }
 
 #cat-trans-container .inline-drawer-title {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 10px !important;
     flex: 1 !important;
     font-family: inherit;
+    font-size: 1.1em;
 }
 
-/* 💡 순정 토글 화살표 디자인 및 위치 동기화 */
+/* 순정 토글 화살표 동기화 */
 #cat-trans-container .inline-drawer-toggle {
     transition: transform 0.2s ease-in-out !important;
     font-size: 0.9em !important;
     opacity: 0.7 !important;
     margin-left: auto !important;
-    pointer-events: none; /* 헤더 클릭 이벤트를 방해하지 않음 */
 }
 
-/* 💡 화살표 회전 애니메이션 강제 적용 */
-.fa-rotate-180 {
-    transform: rotate(180deg) !important;
-}
+.fa-rotate-180 { transform: rotate(180deg) !important; }
 
-/* 💡 설정 저장 버튼 스타일 (졸귀 아이콘 유지) */
+/* 설정 저장 버튼 */
 #cat-save-btn {
     background-color: rgba(168, 199, 250, 0.15);
     border: 1px solid #a8c7fa;
     color: #a8c7fa;
     margin-top: 10px;
-    padding: 8px;
-    border-radius: 6px;
+    padding: 10px;
+    border-radius: 8px;
     transition: all 0.2s;
     cursor: pointer;
     width: 100%;
     font-family: inherit;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 #cat-save-btn:hover {
     background-color: rgba(168, 199, 250, 0.3);
-    box-shadow: 0 0 10px rgba(168, 199, 250, 0.2);
+    box-shadow: 0 0 12px rgba(168, 199, 250, 0.3);
 }
 
-/* 💡 고양이 이모지 전용 빙글빙글 애니메이션! */
+/* 💡 [v4.3.0] 입력창 아이콘 위치 정밀 교정 */
+#cat-input-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    vertical-align: middle !important;
+    height: 100% !important;
+    padding-bottom: 2px !important; /* 미세한 상하 정렬 조정 */
+}
+
+/* 고양이 애니메이션 */
 .cat-spin-anim {
     display: inline-block !important;
     animation: cat-emoji-spin 1.2s infinite linear !important;
@@ -64,10 +83,9 @@
     100% { transform: rotate(360deg); }
 }
 
-/* 터치/마우스 호버 시 효과 */
 #cat-input-btn:hover .cat-emoji-icon, 
 .cat-mes-trans-btn:hover .cat-emoji-icon { 
-    transform: scale(1.15); 
+    transform: scale(1.2); 
     transition: transform 0.2s; 
 }
 .cat-mes-revert-btn:hover { 
