@@ -4,18 +4,26 @@ import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 const extName = "cat-translator";
 const stContext = getContext();
 
+// 💡 [v4.4.0] 더 정교해진 태그 보존형 기본 프롬프트
+const defaultPrompt = 'You are a professional translator. Translate the given text into {{language}}.\n\n[CRITICAL RULE]\n1. KEEP ALL HTML tags (e.g., <font>, <details>, <summary>, <div>, <span>) and CSS styles EXACTLY as they are.\n2. DO NOT translate any content inside style attributes or tag definitions.\n3. ONLY translate the natural language text found between the tags.\n4. DO NOT wrap the output in Markdown code blocks (```) unless the original text was a code block.\n5. Maintain all Markdown formatting like **, _, > etc.';
+
 const defaultSettings = {
     profile: '', 
     customKey: '',
     directModel: 'gemini-1.5-flash',
     autoMode: 'none',
     targetLang: 'Korean',
-    prompt: 'You are a highly skilled professional translator. Translate the given text into {{language}}.\n\nCRITICAL RULE: Maintain all HTML tags (e.g., <font>, <details>, <summary>, <div>), CSS styles, and Markdown formatting exactly as they are. ONLY translate the natural language text content found inside or between these tags. Do not output raw code blocks unless the original text was a literal programming code block.',
+    prompt: defaultPrompt,
     filterCodeBlock: true,
     maxTokens: 0
 };
 
+// 설정 불러오기 및 유실 방지
 let settings = Object.assign({}, defaultSettings, extension_settings[extName]);
+// 💡 만약 사용자가 프롬프트를 비워뒀다면 기본 프롬프트로 강제 복구
+if (!settings.prompt || settings.prompt.trim() === "") {
+    settings.prompt = defaultPrompt;
+}
 
 let textAreaOriginal = "";
 let textAreaTranslated = "";
@@ -32,7 +40,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
         : settings.prompt.replace('{{language}}', targetLang);
 
     const variationPrompt = previousTranslation 
-        ? `\n\n[Optional: Provide a different expression than "${previousTranslation}"]` 
+        ? `\n\n[Alternative expression needed. Avoid repeating: "${previousTranslation}"]` 
         : "";
 
     const promptWithText = `${basePrompt}${variationPrompt}\n\n${text}`;
@@ -51,10 +59,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             
             const body = {
                 contents: [{ role: "user", parts: [{ text: promptWithText }] }],
-                generationConfig: { 
-                    temperature: 0.3,
-                    topP: 0.8
-                },
+                generationConfig: { temperature: 0.3 },
                 safetySettings: [
                     { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
                     { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
@@ -74,16 +79,16 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             
             if (data.promptFeedback?.blockReason) {
                 console.warn("[Cat Translator] Blocked:", data.promptFeedback.blockReason);
-                return `[번역 거부됨: ${data.promptFeedback.blockReason}]`;
+                return `[번역 거절: ${data.promptFeedback.blockReason}]`;
             }
             
             result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
         }
 
-        // 💡 만약 번역본이 ``` 로 감싸져서 오면 (AI의 실수), 내용만 추출
+        // AI가 코드 블록으로 감싸서 출력하는 실수 방지
         if (settings.filterCodeBlock && result) {
             let trimmed = result.trim();
-            const backticks = String.fromCharCode(96, 96, 96);
+            const backticks = "```";
             if (trimmed.startsWith(backticks) && trimmed.endsWith(backticks)) {
                 const firstNewLine = trimmed.indexOf('\n');
                 const lastBackticks = trimmed.lastIndexOf(backticks);
@@ -131,8 +136,8 @@ function revertMessage(id) {
 
 function setupUI() {
     if (!$('#cat-input-btn').length) {
-        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:10px; display:inline-flex; align-items:center; font-size:1.5em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
-        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:8px; color:#ffb4a2; font-size:1.3em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
+        const catBtn = $('<div id="cat-input-btn" title="고양이 번역 (계속 누르면 바뀜)" style="cursor:pointer; margin-right:12px; display:inline-flex; align-items:center; font-size:1.5em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
+        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본으로 되돌리기" style="cursor:pointer; margin-right:10px; color:#ffb4a2; font-size:1.3em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
         
         $('#send_but').before(catBtn).before(revertBtn);
         
@@ -163,70 +168,18 @@ function setupUI() {
                     <div class="inline-drawer-toggle fa-solid fa-chevron-down"></div>
                 </div>
                 <div class="inline-drawer-content" style="display: none;">
-                    <div class="cat-setting-row">
-                        <label>Connection Profile (프리셋 연동)</label>
-                        <select id="ct-profile" class="text_pole">
-                            <option value="">⚡ 직접 연결 모드</option>
-                            ${profileOptions}
-                        </select>
-                    </div>
+                    <div class="cat-setting-row"><label>Connection Profile (프리셋 연동)</label><select id="ct-profile" class="text_pole"><option value="">⚡ 직접 연결 모드</option>${profileOptions}</select></div>
                     <div id="direct-mode-settings" style="border-left: 2px solid #a8c7fa; padding-left: 10px; margin-bottom: 15px; display: ${settings.profile === '' ? 'block' : 'none'};">
-                        <div class="cat-setting-row">
-                            <label>직접 연결: API Key</label>
-                            <input type="password" id="ct-key" class="text_pole" placeholder="직접 입력">
-                        </div>
-                        <div class="cat-setting-row">
-                            <label>직접 연결: Flash Model</label>
-                            <select id="ct-model" class="text_pole">
-                                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                                <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option>
-                                <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option>
-                            </select>
-                        </div>
+                        <div class="cat-setting-row"><label>직접 연결: API Key</label><input type="password" id="ct-key" class="text_pole" placeholder="직접 입력"></div>
+                        <div class="cat-setting-row"><label>직접 연결: Flash Model</label><select id="ct-model" class="text_pole"><option value="gemini-1.5-flash">Gemini 1.5 Flash</option><option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option><option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option></select></div>
                     </div>
-                    <div class="cat-setting-row">
-                        <label>Auto Mode</label>
-                        <select id="ct-auto-mode" class="text_pole">
-                            <option value="none">사용 안함</option>
-                            <option value="input">입력만</option>
-                            <option value="output">출력만</option>
-                            <option value="both">둘 다</option>
-                        </select>
+                    <div class="cat-setting-row"><label>Auto Mode</label><select id="ct-auto-mode" class="text_pole"><option value="none">사용 안함</option><option value="input">입력만</option><option value="output">출력만</option><option value="both">둘 다</option></select></div>
+                    <div class="cat-setting-row"><label>Target Language</label><select id="ct-lang" class="text_pole"><option value="Korean">Korean</option><option value="English">English</option><option value="Japanese">Japanese</option><option value="Chinese (Simplified)">Chinese (Simplified)</option><option value="Chinese (Traditional)">Chinese (Traditional)</option><option value="Spanish">Spanish</option><option value="French">French</option><option value="German">German</option><option value="Russian">Russian</option><option value="Italian">Italian</option><option value="Portuguese">Portuguese</option><option value="Vietnamese">Vietnamese</option><option value="Thai">Thai</option><option value="Indonesian">Indonesian</option><option value="Arabic">Arabic</option></select></div>
+                    <div class="cat-setting-row"><label>번역 프롬프트</label><textarea id="ct-prompt" class="text_pole" rows="4"></textarea>
+                        <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;"><input type="checkbox" id="ct-filter-code"> Filter Code Block</label>
                     </div>
-                    <div class="cat-setting-row">
-                        <label>Target Language</label>
-                        <select id="ct-lang" class="text_pole">
-                            <option value="Korean">Korean</option>
-                            <option value="English">English</option>
-                            <option value="Japanese">Japanese</option>
-                            <option value="Chinese (Simplified)">Chinese (Simplified)</option>
-                            <option value="Chinese (Traditional)">Chinese (Traditional)</option>
-                            <option value="Spanish">Spanish</option>
-                            <option value="French">French</option>
-                            <option value="German">German</option>
-                            <option value="Russian">Russian</option>
-                            <option value="Italian">Italian</option>
-                            <option value="Portuguese">Portuguese</option>
-                            <option value="Vietnamese">Vietnamese</option>
-                            <option value="Thai">Thai</option>
-                            <option value="Indonesian">Indonesian</option>
-                            <option value="Arabic">Arabic</option>
-                        </select>
-                    </div>
-                    <div class="cat-setting-row">
-                        <label>번역 프롬프트</label>
-                        <textarea id="ct-prompt" class="text_pole" rows="4"></textarea>
-                        <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;">
-                            <input type="checkbox" id="ct-filter-code"> Filter Code Block
-                        </label>
-                    </div>
-                    <div class="cat-setting-row">
-                        <label>Max Tokens (0 = 무한)</label>
-                        <input type="number" id="ct-tokens" class="text_pole" min="0">
-                    </div>
-                    <div class="cat-setting-row" style="margin-top: 15px;">
-                        <button id="cat-save-btn" class="menu_button">설정 저장 🐱</button>
-                    </div>
+                    <div class="cat-setting-row"><label>Max Tokens (0 = 무한)</label><input type="number" id="ct-tokens" class="text_pole" min="0"></div>
+                    <div class="cat-setting-row" style="margin-top: 15px;"><button id="cat-save-btn" class="menu_button">설정 저장 🐱</button></div>
                 </div>
             </div>
         `;
@@ -246,12 +199,8 @@ function setupUI() {
             toastr.success("🐱 설정이 성공적으로 저장되었습니다!");
         });
 
-        $('#ct-profile').val(settings.profile).on('change', function() { 
-            settings.profile = $(this).val(); 
-            if(settings.profile === '') $('#direct-mode-settings').slideDown();
-            else $('#direct-mode-settings').slideUp();
-            saveSettings(); 
-        });
+        // UI에 저장된 값 표시
+        $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); if(settings.profile === '') $('#direct-mode-settings').slideDown(); else $('#direct-mode-settings').slideUp(); saveSettings(); });
         $('#ct-key').val(settings.customKey).on('input', function() { settings.customKey = $(this).val(); saveSettings(); });
         $('#ct-model').val(settings.directModel).on('change', function() { settings.directModel = $(this).val(); saveSettings(); });
         $('#ct-auto-mode').val(settings.autoMode).on('change', function() { settings.autoMode = $(this).val(); saveSettings(); });
