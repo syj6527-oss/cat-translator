@@ -1,8 +1,8 @@
-import { extension_settings } from '../../../extensions.js';
-import { secret_state, SECRET_KEYS } from '../../../secrets.js';
+import { extension_settings, getContext } from '../../../../scripts/extensions.js';
+import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 
-const extName = "cat-translator"; 
-const stContext = SillyTavern.getContext();
+const extName = "cat-translator";
+const stContext = getContext();
 
 const defaultSettings = {
     profile: '', customKey: '', directModel: 'gemini-1.5-flash',
