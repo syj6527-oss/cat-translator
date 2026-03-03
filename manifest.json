@@ -1,6 +1,7 @@
 {
-    "name": "고양이번역기",
+    "name": "cat-translator",
+    "display_name": "Cat Translator",
     "version": "2.2.0",
-    "description": "Custom Cat Translator",
+    "description": "Custom translator for SillyTavern",
     "author": "ST User"
 }
