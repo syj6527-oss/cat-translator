@@ -5,3 +5,17 @@
 #cat-input-btn:hover { filter: brightness(1.5); transform: scale(1.1); transition: all 0.2s; }
 .cat-mes-trans-btn:hover { opacity: 1 !important; transition: all 0.2s; }
 .cat-mes-revert-btn:hover { opacity: 1 !important; transition: all 0.2s; }
+.cat-spin {
+    display: inline-block;
+    font-size: 18px;
+    transition: transform 0.2s ease;
+}
+
+.cat-spin.spin {
+    animation: catRotate 1s linear infinite;
+}
+
+@keyframes catRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
