@@ -205,7 +205,7 @@ function setupUI() {
         `;
         $('#extensions_settings').append(uiHtml);
         $('#cat-trans-container .inline-drawer-header').off('click').on('click', function(e) { e.stopPropagation(); const $content = $(this).next('.inline-drawer-content'); const $toggle = $(this).find('.inline-drawer-toggle'); $content.stop().slideToggle(200); $toggle.toggleClass('fa-rotate-180'); });
-        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 설정이 저장되었습니다!"); });
+        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 설정이 저장되었습니다! 🐾"); });
         $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); if(settings.profile === '') $('#direct-mode-settings').slideDown(); else $('#direct-mode-settings').slideUp(); saveSettings(); });
         $('#ct-key').val(settings.customKey).on('input', function() { settings.customKey = $(this).val(); saveSettings(); });
         $('#ct-model').val(settings.directModel).on('change', function() { settings.directModel = $(this).val(); saveSettings(); });
