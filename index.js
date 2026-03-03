@@ -4,8 +4,8 @@ import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 const extName = "cat-translator";
 const stContext = getContext();
 
-// 💡 [v4.6.0] 상태창(Summary)과 태그 내부 텍스트 번역을 강력히 요구하는 프롬프트
-const defaultPrompt = 'You are a professional translator. Translate the text into {{language}}.\n\n[STRICT RULES]\n1. Translate ALL text inside tags like <summary>, <details>, <font>, and <div> (e.g., "Time", "Characters").\n2. KEEP all HTML/CSS tags and attributes exactly as they are. DO NOT translate code or style values.\n3. DO NOT wrap the output in Markdown code blocks (```).\n4. Deliver only the translated result while maintaining the exact original structure.';
+// 💡 [v4.7.0] 코드 블록과 주석 내부까지 낱낱이 번역하도록 지시하는 끝판왕 프롬프트
+const defaultPrompt = 'You are a professional translator. Your goal is to translate EVERY piece of natural language text into {{language}}, NO MATTER WHERE IT IS LOCATED.\n\n[MANDATORY INSTRUCTIONS]\n1. Translate text inside code blocks (e.g., ```yaml, ```json).\n2. Translate text inside HTML comments (e.g., <!-- text -->).\n3. Translate text inside all tags like <memo>, <summary>, <details>, <font>, etc.\n4. KEEP all structural tags, brackets, and code syntax EXACTLY as they are. Only swap the English words for {{language}}.\n5. DO NOT skip any section. If it is human-readable text, translate it.';
 
 const defaultSettings = {
     profile: '', 
@@ -19,8 +19,8 @@ const defaultSettings = {
 };
 
 let settings = Object.assign({}, defaultSettings, extension_settings[extName]);
-if (!settings.prompt || settings.prompt.trim() === "") {
-    settings.prompt = defaultPrompt;
+if (!settings.prompt || settings.prompt.trim() === "" || settings.prompt.includes('professional translator')) {
+    settings.prompt = defaultPrompt; // 새 버전 프롬프트로 강제 갱신
 }
 
 let textAreaOriginal = "";
@@ -34,11 +34,11 @@ function saveSettings() {
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     const targetLang = isInput ? "English" : settings.targetLang;
     const basePrompt = isInput 
-        ? "Translate the following text into natural English while keeping all tags." 
+        ? "Translate the following text into natural English. Preserve all tags and formatting." 
         : settings.prompt.replace('{{language}}', targetLang);
 
     const variationPrompt = previousTranslation 
-        ? `\n\n[Alternative expression for: "${previousTranslation}"]` 
+        ? `\n\n[Note: Use a different phrasing than: "${previousTranslation}"]` 
         : "";
 
     const promptWithText = `${basePrompt}${variationPrompt}\n\n${text}`;
@@ -57,7 +57,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             
             const body = {
                 contents: [{ role: "user", parts: [{ text: promptWithText }] }],
-                generationConfig: { temperature: 0.3 },
+                generationConfig: { temperature: 0.2 }, // 번역 정확도를 위해 온도를 낮춤
                 safetySettings: [
                     { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
                     { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
@@ -76,7 +76,6 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             const data = await response.json();
             
             if (data.promptFeedback?.blockReason) {
-                console.warn("[Cat Translator] Blocked:", data.promptFeedback.blockReason);
                 return `[번역 거부: ${data.promptFeedback.blockReason}]`;
             }
             
@@ -86,13 +85,11 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
         if (settings.filterCodeBlock && result) {
             let trimmed = result.trim();
             const backticks = "```";
-            if (trimmed.startsWith(backticks) && trimmed.endsWith(backticks)) {
-                const firstNewLine = trimmed.indexOf('\n');
-                const lastBackticks = trimmed.lastIndexOf(backticks);
-                if (firstNewLine !== -1 && lastBackticks > firstNewLine) {
-                    result = trimmed.substring(firstNewLine + 1, lastBackticks).trim();
-                } else {
-                    result = trimmed.replace(/```/g, "").trim();
+            // 💡 원본이 코드 블록이 아닌데 결과가 코드 블록이면 껍데기 제거
+            if (trimmed.startsWith(backticks) && trimmed.endsWith(backticks) && !text.trim().startsWith(backticks)) {
+                const lines = trimmed.split('\n');
+                if (lines.length > 2) {
+                    result = lines.slice(1, -1).join('\n').trim();
                 }
             }
         }
@@ -133,9 +130,9 @@ function revertMessage(id) {
 
 function setupUI() {
     if (!$('#cat-input-btn').length) {
-        // 💡 [v4.6.0] 아이콘 크기를 약간 줄이고(1.3em), 여백을 최적화하여 입력창 공간 확보
+        // 💡 [v4.7.0] 아이콘 여백을 0에 가깝게 줄여서 입력창 공간 확보
         const catBtn = $('<div id="cat-input-btn" title="고양이 번역" style="cursor:pointer; margin-right:4px; display:inline-flex; align-items:center; font-size:1.3em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
-        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본 복구" style="cursor:pointer; margin-right:6px; color:#ffb4a2; font-size:1.1em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
+        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본 복구" style="cursor:pointer; margin-right:4px; color:#ffb4a2; font-size:1.1em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
         
         $('#send_but').before(catBtn).before(revertBtn);
         
@@ -159,7 +156,7 @@ function setupUI() {
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
-                    <div class="inline-drawer-title" style="display:flex !important; align-items:center !important; gap:8px !important; font-family:inherit;">
+                    <div class="inline-drawer-title">
                         <span class="cat-emoji-icon" style="font-size:1.3em; line-height:1;">🐱</span>
                         <span style="font-weight:bold;">트랜스레이터</span>
                     </div>
@@ -169,10 +166,10 @@ function setupUI() {
                     <div class="cat-setting-row"><label>Connection Profile</label><select id="ct-profile" class="text_pole"><option value="">⚡ 직접 연결 모드</option>${profileOptions}</select></div>
                     <div id="direct-mode-settings" style="border-left: 2px solid #a8c7fa; padding-left: 10px; margin-bottom: 15px; display: ${settings.profile === '' ? 'block' : 'none'};">
                         <div class="cat-setting-row"><label>API Key</label><input type="password" id="ct-key" class="text_pole" placeholder="직접 입력"></div>
-                        <div class="cat-setting-row"><label>Flash Model</label><select id="ct-model" class="text_pole"><option value="gemini-1.5-flash">Gemini 1.5 Flash</option><option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option><option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option></select></div>
+                        <div class="cat-setting-row"><label>직접 연결: Model</label><select id="ct-model" class="text_pole"><option value="gemini-1.5-flash">Gemini 1.5 Flash</option><option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option><option value="gemini-2.0-flash-exp">Gemini 2.0 Flash</option></select></div>
                     </div>
                     <div class="cat-setting-row"><label>Auto Mode</label><select id="ct-auto-mode" class="text_pole"><option value="none">사용 안함</option><option value="input">입력만</option><option value="output">출력만</option><option value="both">둘 다</option></select></div>
-                    <div class="cat-setting-row"><label>Target Language</label><select id="ct-lang" class="text_pole"><option value="Korean">Korean</option><option value="English">English</option><option value="Japanese">Japanese</option><option value="Chinese (Simplified)">Chinese (Simplified)</option><option value="Chinese (Traditional)">Chinese (Traditional)</option><option value="Spanish">Spanish</option><option value="French">French</option><option value="German">German</option><option value="Russian">Russian</option><option value="Italian">Italian</option><option value="Portuguese">Portuguese</option><option value="Vietnamese">Vietnamese</option><option value="Thai">Thai</option><option value="Indonesian">Indonesian</option><option value="Arabic">Arabic</option></select></div>
+                    <div class="cat-setting-row"><label>Target Language</label><select id="ct-lang" class="text_pole"><option value="Korean">Korean</option><option value="English">English</option><option value="Japanese">Japanese</option><option value="Spanish">Spanish</option><option value="French">French</option><option value="German">German</option><option value="Russian">Russian</option><option value="Vietnamese">Vietnamese</option></select></div>
                     <div class="cat-setting-row"><label>번역 프롬프트</label><textarea id="ct-prompt" class="text_pole" rows="4"></textarea>
                         <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;"><input type="checkbox" id="ct-filter-code"> Filter Code Block</label>
                     </div>
@@ -193,7 +190,7 @@ function setupUI() {
 
         $('#cat-save-btn').on('click', function() {
             saveSettings();
-            toastr.success("🐾설정이 저장되었습니다!");
+            toastr.success("🐱 설정이 저장되었습니다!");
         });
 
         $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); if(settings.profile === '') $('#direct-mode-settings').slideDown(); else $('#direct-mode-settings').slideUp(); saveSettings(); });
