@@ -1,8 +1,8 @@
 {
     "name": "cat-translator",
     "display_name": "🐱트랜스레이터",
-    "version": "5.5.0",
-    "description": "Cat Translator Pro (Ultimate Master Build with Token Saver)",
+    "version": "5.6.0",
+    "description": "Cat Translator Pro (Smart Retry & Cache Update)",
     "author": "ST User",
     "js": "index.js",
     "css": "style.css"
