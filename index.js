@@ -190,7 +190,7 @@ function setupUI() {
 
         $('#cat-save-btn').on('click', function() {
             saveSettings();
-            toastr.success("🐱 설정이 저장되었습니다!");
+            toastr.success("🐾 설정이 저장되었습니다! 🐾");
         });
 
         $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); if(settings.profile === '') $('#direct-mode-settings').slideDown(); else $('#direct-mode-settings').slideUp(); saveSettings(); });
