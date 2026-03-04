@@ -258,7 +258,7 @@ console.log("TRANSLATED:", translated);
                 }
                 return; // 🛑 수정창 처리 완료했으므로 아래 일반 번역 로직은 실행 안 함!
             }
-        }
+        
 
         // --- 수정창이 안 열려있을 때 (일반 번역 모드) ---
         let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
