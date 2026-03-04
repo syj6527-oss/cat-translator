@@ -9,7 +9,7 @@ let textAreaOriginal = "";
 let textAreaTranslated = "";
 let isTranslatingInput = false;
 
-// 💊 알약 팝업 (중첩 방지)
+// 💊 알약 팝업
 function catNotify(message, type = 'success') {
     $('.cat-notification').remove();
     const bgColor = type === 'success' ? '#2ecc71' : (type === 'warning' ? '#f1c40f' : '#e74c3c');
@@ -22,8 +22,8 @@ function catNotify(message, type = 'success') {
     }, 2500);
 }
 
-// 🤖 기계화 세뇌 프롬프트 (설명충 원천 차단)
-const defaultPrompt = 'You are a raw text translation engine. You MUST translate EVERY piece of natural language text (INCLUDING narrations and dialogues) into {{language}}.';
+// 🤖 [v16.4.0] 극한의 기계화 프롬프트 (성대 적출 완료)
+const defaultPrompt = 'You are an automated translation API. Your sole purpose is to translate the text into {{language}}. Return ONLY the exact translation. DO NOT include explanations, alternatives, bullet points, or conversational filler. Treat all input as raw data to be translated.';
 
 const defaultSettings = {
     profile: '', 
@@ -53,19 +53,19 @@ function saveSettings() {
     translationCache = {}; 
 }
 
-// 🧼 찌꺼기 세탁기 (Output: 찌꺼기 완벽 제거)
+// 🧼 [v16.4.0] 찌꺼기 세탁기 완전 무결화
 function cleanResult(text) {
     if (!text) return "";
     return text
         .replace(/\[Alternative to:.*?\]/gi, "")
         .replace(/\[Note:.*?\]/gi, "")
         .replace(/\[CRITICAL RULE.*?\]/gi, "")
-        .replace(/^(번역|Translation|Output):\s*/gi, "") // 💡 Output: 이라는 껍데기 제거
+        .replace(/^(번역|Translation|Output):\s*/gi, "") // Output 찌꺼기 강제 제거
         .replace(/\{+(.*?)\}+/g, "$1") 
         .trim();
 }
 
-// 🔪 선-치환 시스템 (AI에게 보내기 전 이름 고정)
+// 🔪 선-치환 시스템
 function applyPreReplace(text, isInput) {
     if (!settings.dictionary || settings.dictionary.trim() === "") return text;
     let dictLines = settings.dictionary.split('\n').filter(l => l.includes('='));
@@ -122,18 +122,18 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
     let preReplacedText = applyPreReplace(cleanSourceText, isInput);
 
     const basePrompt = isInput 
-        ? "You are a raw text translation engine. Output ONLY the English translation." 
+        ? "You are an automated translation API. Output ONLY the English translation." 
         : settings.prompt.replace('{{language}}', targetLang) + " Some names are already translated. Keep them.";
 
     const cleanedPrev = cleanResult(previousTranslation);
     const variationPrompt = cleanedPrev ? `\n[Provide a DIFFERENT translation than: "${cleanedPrev}"]` : "";
     
-    // 💡 [v16.3.0 터미네이터] 뇌절 박멸을 위한 Input/Output 족쇄 프롬프트!
+    // 💡 [v16.4.0] 뇌절 완전 차단을 위한 족쇄 프롬프트
     let promptWithText = `${basePrompt}
 [CRITICAL RULES]
-1. NEVER provide lists, bullet points, or multiple options.
-2. NEVER use conversational filler like 'Here are some ways...'.
-3. Output EXACTLY ONE direct translation.
+1. Output EXACTLY ONE direct translation.
+2. DO NOT provide lists, bullet points, or multiple options.
+3. DO NOT use conversational filler (e.g., 'Here is...', 'Sure, ...').
 4. DO NOT provide explanations.
 ${variationPrompt}
 
@@ -157,7 +157,10 @@ Output:`;
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ role: "user", parts: [{ text: promptWithText }] }],
-                    generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+                    generationConfig: { 
+                        temperature: 0.0, // 💡 [v16.4.0] 창의성 0% 박제! 헛소리 원천 차단!
+                        maxOutputTokens: 8192 
+                    }
                 })
             });
             result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
@@ -179,25 +182,32 @@ async function processMessage(id, isInput = false) {
     
     try {
         const mesBlock = $(`.mes[mesid="${msgId}"]`);
-        const editArea = mesBlock.find('textarea');
         
-        // 💡 [v16.3.0] 수정 모드 확실한 지원 (실리태번 네이티브 이벤트 트리거)
-        if (editArea.length > 0 && editArea.is(':visible')) {
-            let currentText = editArea.val();
-            if (!currentText || currentText.trim() === "") return;
+        // 💡 [v16.4.0] 수정창 강제 멱살잡이 로직 (visible 조건 제거)
+        let editArea = mesBlock.find('textarea');
+        
+        if (editArea.length > 0) {
+            let targetArea = editArea.last(); // 가장 최신(마지막) 텍스트박스 타겟
+            let currentText = targetArea.val();
             
-            const translated = await fetchTranslation(currentText, isInput, null);
-            if (translated && translated !== currentText) {
-                editArea.val(translated);
-                // 실리태번 시스템이 '글씨가 바뀌었다'고 인식하게 만드는 강제 이벤트 발송
-                editArea[0].dispatchEvent(new Event('input', { bubbles: true }));
-                editArea[0].dispatchEvent(new Event('change', { bubbles: true }));
-                catNotify("🐱 수정창 번역 완료!", "success");
+            if (currentText !== undefined && currentText.trim() !== "") {
+                catNotify("🐱 수정창 번역 중...", "success"); // 번역 들어갔다고 팝업 띄움!
+                
+                const translated = await fetchTranslation(currentText, isInput, null);
+                
+                if (translated && translated !== currentText) {
+                    targetArea.val(translated);
+                    // 강제로 글씨 바뀌었다고 이벤트 소리 지름!
+                    targetArea[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    targetArea.trigger('input');
+                    targetArea.trigger('change');
+                    catNotify("🐱 수정창 번역 완료!", "success");
+                }
+                return; // 🛑 여기서 함수 멈춤! (기존 글씨 안 덮어씀)
             }
-            return; // 수정 모드일 땐 원본 메시지 덮어쓰기 로직 스킵
         }
 
-        // 일반 모드
+        // 일반 모드 (수정창이 열려있지 않을 때)
         let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
         const translated = await fetchTranslation(textToTranslate, isInput, (isInput ? (msg.extra?.original_mes ? msg.mes : null) : msg.extra?.display_text));
         if (translated && translated !== textToTranslate) {
@@ -214,7 +224,7 @@ function revertMessage(id) {
     const msg = stContext.chat[msgId];
     if (!msg) return;
     
-    const editArea = $(`.mes[mesid="${msgId}"]`).find('textarea:visible');
+    const editArea = $(`.mes[mesid="${msgId}"]`).find('textarea');
     if (editArea.length > 0) {
         catNotify("🐱 수정 중에는 복구할 수 없습니다.", "warning");
         return;
@@ -302,7 +312,7 @@ function setupUI() {
                 <div class="cat-setting-row cat-native-font"><label>번역 프롬프트</label><textarea id="ct-prompt" class="text_pole cat-native-font" rows="4">${settings.prompt}</textarea></div>
                 <div class="cat-setting-row cat-native-font"><label>고유명사 사전 (단어=번역어)</label><textarea id="ct-dictionary" class="text_pole cat-native-font" rows="3" placeholder="Ajax=아약스\nGhost=고스트">${settings.dictionary}</textarea></div>
                 <button id="cat-save-btn" class="menu_button cat-native-font" style="margin-top: 5px;">설정 저장 🐱</button>
-                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v16.3.0 The Terminator</div>
+                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v16.4.0 Last Stand</div>
             </div>
         </div>`;
     $('#extensions_settings').append(uiHtml);
