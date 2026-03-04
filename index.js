@@ -210,6 +210,9 @@ async function processMessage(id, isInput = false) {
 
 const sourceLang = detectLang(textToTranslate);
 
+console.log("INPUT TEXT:", textToTranslate);
+console.log("isTranslatingInput:", isTranslatingInput);
+
 if (isTranslatingInput || !textToTranslate) return;
 
 const targetLang = sourceLang === "ko"
