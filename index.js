@@ -8,8 +8,11 @@ let translationCache = {};
 let textAreaOriginal = "";
 let textAreaTranslated = "";
 
-// [v8.1.0] 번역 프롬프트 최적화
-const defaultPrompt = 'You are a professional translator. Your absolute mission is to translate EVERY piece of natural language text into {{language}}, regardless of its location.\n\n[MANDATORY]\n1. Translate text inside code blocks (```), HTML comments (<!-- text -->), and all tags (<summary>, <details>, <memo>, <font>).\n2. KEEP all structural symbols, brackets, and code syntax EXACTLY as they are. Only swap English words for {{language}}.\n3. DO NOT translate HTML attributes or CSS property names.\n4. Output ONLY the translated result without any commentary.';
+// 애니메이션 유지 상태 락
+let isTranslatingInput = false;
+
+// 기본 프롬프트 (태그 보호 + 설명충 방지)
+const defaultPrompt = 'You are a professional translator. Your absolute mission is to translate EVERY piece of natural language text into {{language}}, regardless of its location.\n\n[MANDATORY]\n1. Translate text inside code blocks (```), HTML comments (<!-- text -->), and all tags (<summary>, <details>, <memo>, <font>).\n2. KEEP all structural symbols, brackets, and code syntax EXACTLY as they are. Only swap English words for {{language}}.\n3. DO NOT translate HTML attributes or CSS property names.\n4. Output ONLY the translated result without any commentary or explanations.';
 
 const defaultSettings = {
     profile: '', 
@@ -25,7 +28,7 @@ const defaultSettings = {
 let settings = Object.assign({}, defaultSettings, extension_settings[extName]);
 if (!settings.prompt || settings.prompt.trim() === "") settings.prompt = defaultPrompt;
 
-// 💡 설정 저장 로직 (모든 값 동기화)
+// 💡 안전 저장 로직
 function saveSettings() {
     settings.prompt = $('#ct-prompt').val() || settings.prompt;
     settings.targetLang = $('#ct-lang').val() || settings.targetLang;
@@ -39,35 +42,39 @@ function saveSettings() {
     translationCache = {}; 
 }
 
-// 💡 중첩 방지 클리닝 (사진 15055.jpg 완벽 해결 유지)
+// 💡 중첩 태그 청소 로직 (사진 15055.jpg 방어)
 function cleanResult(text) {
     if (!text) return "";
-    return text.replace(/\[Alternative to:.*?\]/gs, "")
-               .replace(/\[Note:.*?\]/gs, "")
-               .replace(/\[CRITICAL:.*?\]/gs, "")
-               .replace(/\[Different phrasing than:.*?\]/gs, "")
+    return text.replace(/\[Alternative to:.*?\]/gi, "")
+               .replace(/\[Note:.*?\]/gi, "")
+               .replace(/\[CRITICAL:.*?\]/gi, "")
+               .replace(/\[Different phrasing than:.*?\]/gi, "")
+               .replace(/\*\*.*\*\*/g, "") // 마크다운 설명충 방어
                .trim();
 }
 
 /**
- * 핵심 번역 함수
+ * 핵심 번역 로직
  */
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     if (!text || text.trim() === "") return text;
     const cacheKey = `${settings.targetLang}_${isInput ? 'toEn' : 'toTarget'}_${text}`;
     
+    // 💡 깜찍한 알림 (명세서 복구)
     if (!previousTranslation && translationCache[cacheKey]) {
         toastr.info("🐱 캐시 사용: 토큰을 아꼈습니다!");
         return translationCache[cacheKey];
     }
 
     const targetLang = isInput ? "English" : settings.targetLang;
+    
+    // 💡 사전충 완벽 방어 프롬프트 (사진 15170.jpg 방어)
     const basePrompt = isInput 
-        ? "Translate to natural English accurately. Keep all tags." 
+        ? "You are a raw text translator. Output ONLY the translated English text. NO explanations. NO dictionary definitions. NO introductory phrases. Just give the exact translation." 
         : settings.prompt.replace('{{language}}', targetLang);
 
     const cleanedPrev = cleanResult(previousTranslation);
-    const variationPrompt = cleanedPrev ? `\n\n[Note: Please provide a DIFFERENT phrasing than the previous result: "${cleanedPrev}"]` : "";
+    const variationPrompt = cleanedPrev ? `\n\n[CRITICAL RULE: Provide a completely different translation than: "${cleanedPrev}". No notes.]` : "";
     const promptWithText = `${basePrompt}${variationPrompt}\n\n${text}`;
 
     try {
@@ -85,34 +92,51 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     contents: [{ role: "user", parts: [{ text: promptWithText }] }],
-                    generationConfig: { temperature: 0.4 }
+                    generationConfig: { temperature: 0.3 }, // 헛소리 방지 온도 하향
+                    safetySettings: [
+                        { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
+                        { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
+                        { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE" },
+                        { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" },
+                        { "category": "HARM_CATEGORY_CIVIC_INTEGRITY", "threshold": "BLOCK_NONE" }
+                    ]
                 })
             });
             const data = await response.json();
+            
+            // 💡 구글 검열 알림 (명세서 복구)
+            if (data.promptFeedback && data.promptFeedback.blockReason) {
+                toastr.warning("🐱 구글 검열: 수위가 너무 높아 번역이 거부되었습니다.");
+                return "[번역 거부됨]";
+            }
             if (data.error) throw new Error(data.error.message);
             result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+        }
+
+        // 제미나이 리스트 출력 강제 방어
+        if (isInput && result.includes('* "')) {
+            const match = result.match(/\*\s*"([^"]+)"/);
+            if (match) result = match[1];
         }
 
         result = cleanResult(result);
         if (result && result !== text) translationCache[cacheKey] = result;
         return result || text;
     } catch (e) {
-        toastr.error(`🐱 에러: ${e.message}`);
+        toastr.error(`🐱 앗, 에러 발생: ${e.message}`);
         return text;
     }
 }
 
 /**
- * 메시지 번역 실행 및 애니메이션 제어
+ * 💡 메시지 번역 실행 (사진 15076.jpg 대응)
  */
 async function processMessage(id, isInput = false) {
     const msgId = parseInt(id, 10); 
     const msg = stContext.chat[msgId];
     if (!msg) return;
 
-    // 💡 [v8.1.0] 고양이 회전 애니메이션 복구
-    const mesBlock = $(`.mes[mesid="${msgId}"]`);
-    const btnIcon = mesBlock.find('.cat-emoji-icon');
+    const btnIcon = $(`.mes[mesid="${msgId}"]`).find('.cat-emoji-icon');
     btnIcon.addClass('cat-spin-anim');
     const startTime = Date.now();
 
@@ -145,7 +169,31 @@ function revertMessage(id) {
 }
 
 /**
- * 💡 [v8.1.0] UI 상시 고정 로직 (전용 주입)
+ * 💡 채팅창 내 모든 메시지에 아이콘 강제 자동 주입 (터치 불필요)
+ */
+function injectMessageButtons() {
+    $('.mes:not(:has(.cat-btn-group))').each(function() {
+        const msgId = $(this).attr('mesid');
+        if (!msgId) return;
+        
+        const isUser = $(this).hasClass('mes_user');
+        const group = $('<div class="cat-btn-group" style="display:inline-flex; gap:10px; margin-left:10px; align-items:center;"><span class="cat-mes-trans-btn" style="cursor:pointer; font-size:1.4em;"><span class="cat-emoji-icon">🐱</span></span><span class="cat-mes-revert-btn fa-solid fa-rotate-left" style="cursor:pointer; color:#ffb4a2; font-size:1em;"></span></div>');
+        
+        $(this).find('.name_text').append(group);
+        
+        group.find('.cat-mes-trans-btn').on('click', (e) => { 
+            e.stopPropagation(); 
+            processMessage(msgId, isUser); 
+        });
+        group.find('.cat-mes-revert-btn').on('click', (e) => { 
+            e.stopPropagation(); 
+            revertMessage(msgId); 
+        });
+    });
+}
+
+/**
+ * 💡 입력창 버튼 강제 주입 및 스핀 유지 (사진 1772602221650.jpeg 대응)
  */
 function injectInputButtons() {
     const sendBut = $('#send_but:visible');
@@ -153,41 +201,65 @@ function injectInputButtons() {
     const target = sendBut.length ? sendBut : (stopBut.length ? stopBut : null);
     
     if (!target || target.length === 0) return;
-    if (target.prev('#cat-input-btn').length > 0) return;
+
+    const existingBtn = target.prev('#cat-input-btn');
+    if (existingBtn.length > 0) {
+        const icon = existingBtn.find('.cat-emoji-icon');
+        if (isTranslatingInput && !icon.hasClass('cat-spin-anim')) icon.addClass('cat-spin-anim');
+        if (!isTranslatingInput && icon.hasClass('cat-spin-anim')) icon.removeClass('cat-spin-anim');
+        return; 
+    }
 
     $('#cat-input-btn, #cat-input-revert-btn').remove();
 
     const catBtn = $('<div id="cat-input-btn" title="번역" style="cursor:pointer; margin-right:2px; display:inline-flex; align-items:center; font-size:1.3em;"><span class="cat-emoji-icon">🐱</span></div>');
     const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="복구" style="cursor:pointer; margin-right:4px; color:#ffb4a2; font-size:1.1em; opacity:0.6;"></div>');
     
+    if (isTranslatingInput) catBtn.find('.cat-emoji-icon').addClass('cat-spin-anim');
+
     target.before(catBtn).before(revertBtn);
     
     catBtn.on('click', async (e) => {
         e.preventDefault();
+        if (isTranslatingInput) return; 
+        
         const area = $('#send_textarea');
-        const icon = catBtn.find('.cat-emoji-icon');
-        if (!area.val() || icon.hasClass('cat-spin-anim')) return;
-        icon.addClass('cat-spin-anim');
+        if (!area.val()) return;
+
+        isTranslatingInput = true; 
+        catBtn.find('.cat-emoji-icon').addClass('cat-spin-anim');
+        
         try {
             const isRetry = (area.val() === textAreaTranslated);
             if (!isRetry) textAreaOriginal = area.val();
             const trans = await fetchTranslation(textAreaOriginal, true, (isRetry ? textAreaTranslated : null));
-            if (trans) { textAreaTranslated = trans; area.val(trans).trigger('input'); }
+            if (trans) { 
+                textAreaTranslated = trans; 
+                area.val(trans).trigger('input'); 
+            }
         } finally {
-            icon.removeClass('cat-spin-anim');
+            setTimeout(() => {
+                isTranslatingInput = false; 
+                $('#cat-input-btn .cat-emoji-icon').removeClass('cat-spin-anim');
+            }, 300);
         }
     });
-    revertBtn.on('click', (e) => { e.preventDefault(); if (textAreaOriginal) $('#send_textarea').val(textAreaOriginal).trigger('input'); });
+
+    revertBtn.on('click', (e) => { 
+        e.preventDefault(); 
+        if (textAreaOriginal) $('#send_textarea').val(textAreaOriginal).trigger('input'); 
+    });
 }
 
 function setupUI() {
     injectInputButtons();
+    injectMessageButtons();
 
     if (!$('#cat-trans-container').length) {
         let profileOptions = '';
         (stContext.extensionSettings?.connectionManager?.profiles || []).forEach(p => { profileOptions += `<option value="${p.id}">${p.name}</option>`; });
         
-        // 💡 [v8.1.0] 언어 리스트 풀패키지 100% 복구
+        // 💡 11개 국어 풀 리스트 복구 (사진 15051.jpg, 15146.jpg 대응)
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
@@ -202,54 +274,51 @@ function setupUI() {
                             <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                             <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
                             <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                            <option value="gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro Exp (궁극)</option>
+                            <option value="gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro Exp</option>
                         </select></div>
                     </div>
                     <div class="cat-setting-row"><label>자동 모드</label><select id="ct-auto-mode" class="text_pole"><option value="none">꺼짐</option><option value="input">입력만</option><option value="output">출력만</option><option value="both">둘 다</option></select></div>
                     <div class="cat-setting-row"><label>목표 언어</label><select id="ct-lang" class="text_pole">
-                        <option value="Korean">Korean</option>
-                        <option value="English">English</option>
-                        <option value="Japanese">Japanese</option>
-                        <option value="Chinese (Simplified)">Chinese (Simplified)</option>
-                        <option value="Chinese (Traditional)">Chinese (Traditional)</option>
-                        <option value="Spanish">Spanish</option>
-                        <option value="French">French</option>
-                        <option value="German">German</option>
-                        <option value="Russian">Russian</option>
-                        <option value="Vietnamese">Vietnamese</option>
-                        <option value="Thai">Thai</option>
+                        <option value="Korean">Korean</option><option value="English">English</option><option value="Japanese">Japanese</option>
+                        <option value="Chinese (Simplified)">Chinese (Simplified)</option><option value="Chinese (Traditional)">Chinese (Traditional)</option>
+                        <option value="Spanish">Spanish</option><option value="French">French</option><option value="German">German</option>
+                        <option value="Russian">Russian</option><option value="Vietnamese">Vietnamese</option><option value="Thai">Thai</option>
                     </select></div>
                     <div class="cat-setting-row"><label>프롬프트</label><textarea id="ct-prompt" class="text_pole" rows="4">${settings.prompt}</textarea></div>
                     <button id="cat-save-btn" class="menu_button">설정 저장 🐱</button>
-                    <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;">v8.1.0 Full Restore</div>
+                    <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;">v8.5.0 Masterpiece Build</div>
                 </div>
             </div>`;
         $('#extensions_settings').append(uiHtml);
-        $('#cat-trans-container .inline-drawer-header').on('click', function() { $(this).next('.inline-drawer-content').slideToggle(200); $(this).find('.inline-drawer-toggle').toggleClass('fa-rotate-180'); });
         
-        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 모든 설정과 언어가 저장되었습니다!"); });
+        $('#cat-trans-container .inline-drawer-header').on('click', function() { 
+            $(this).next('.inline-drawer-content').slideToggle(200); 
+            $(this).find('.inline-drawer-toggle').toggleClass('fa-rotate-180'); 
+        });
+        
+        // 💡 귀여운 저장 알림
+        $('#cat-save-btn').on('click', function() { 
+            saveSettings(); 
+            toastr.success("🐱 모든 설정과 언어가 꼼꼼하게 저장되었습니다!"); 
+        });
         
         $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); $('#direct-mode-settings').toggle(settings.profile === ''); saveSettings(); });
-        $('#ct-model').val(settings.directModel);
-        $('#ct-auto-mode').val(settings.autoMode);
-        $('#ct-lang').val(settings.targetLang);
+        $('#ct-key').on('input', function() { settings.customKey = $(this).val(); });
+        $('#ct-model').val(settings.directModel).on('change', function() { settings.directModel = $(this).val(); saveSettings(); });
+        $('#ct-auto-mode').val(settings.autoMode).on('change', function() { settings.autoMode = $(this).val(); saveSettings(); });
+        $('#ct-lang').val(settings.targetLang).on('change', function() { settings.targetLang = $(this).val(); saveSettings(); });
     }
 }
 
 jQuery(() => {
     setupUI();
     
-    // 💡 부하 없는 상시 감시 로직 (0.25초)
-    setInterval(injectInputButtons, 250);
+    // 💡 0.25초마다 모든 위치(입력창, 채팅 말풍선)에 아이콘 강제 고정
+    setInterval(() => {
+        injectInputButtons();
+        injectMessageButtons();
+    }, 250);
 
     stContext.eventSource.on(stContext.event_types.CHARACTER_MESSAGE_RENDERED, (d) => processMessage(typeof d === 'object' ? d.messageId : d, false));
     stContext.eventSource.on(stContext.event_types.USER_MESSAGE_RENDERED, (d) => processMessage(typeof d === 'object' ? d.messageId : d, true));
-    
-    $(document).on('mouseenter touchstart', '.mes', function() {
-        if ($(this).find('.cat-btn-group').length) return;
-        const group = $('<div class="cat-btn-group" style="display:inline-flex; gap:10px; margin-left:10px; align-items:center;"><span class="cat-mes-trans-btn" style="cursor:pointer; font-size:1.4em;"><span class="cat-emoji-icon">🐱</span></span><span class="cat-mes-revert-btn fa-solid fa-rotate-left" style="cursor:pointer; color:#ffb4a2; font-size:1em;"></span></div>');
-        $(this).find('.name_text').append(group);
-        group.find('.cat-mes-trans-btn').on('click', (e) => { e.stopPropagation(); processMessage($(this).attr('mesid'), $(this).hasClass('mes_user')); });
-        group.find('.cat-mes-revert-btn').on('click', (e) => { e.stopPropagation(); revertMessage($(this).attr('mesid')); });
-    });
 });
