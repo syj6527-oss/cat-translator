@@ -291,7 +291,9 @@ if (editArea.length) {
 } else {
     targetEl = $('#send_textarea')[0];
 }
+
 console.log("TARGET:", targetEl);
+
 let textToTranslate = targetEl.value.trim(); // 메인 입력창 글씨 바로 긁어오기!
         
         if (isTranslatingInput || !textToTranslate) return;
