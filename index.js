@@ -8,7 +8,7 @@ let translationCache = {};
 let textAreaOriginal = "";
 let textAreaTranslated = "";
 
-// [v8.0.0] 태그 보호 및 번역 강제 프롬프트
+// [v8.1.0] 번역 프롬프트 최적화
 const defaultPrompt = 'You are a professional translator. Your absolute mission is to translate EVERY piece of natural language text into {{language}}, regardless of its location.\n\n[MANDATORY]\n1. Translate text inside code blocks (```), HTML comments (<!-- text -->), and all tags (<summary>, <details>, <memo>, <font>).\n2. KEEP all structural symbols, brackets, and code syntax EXACTLY as they are. Only swap English words for {{language}}.\n3. DO NOT translate HTML attributes or CSS property names.\n4. Output ONLY the translated result without any commentary.';
 
 const defaultSettings = {
@@ -25,16 +25,21 @@ const defaultSettings = {
 let settings = Object.assign({}, defaultSettings, extension_settings[extName]);
 if (!settings.prompt || settings.prompt.trim() === "") settings.prompt = defaultPrompt;
 
-// 💡 [v8.0.0] 설정 저장 및 동기화 (저장 유실 방지)
+// 💡 설정 저장 로직 (모든 값 동기화)
 function saveSettings() {
-    const currentPrompt = $('#ct-prompt').val();
-    if (currentPrompt !== undefined) settings.prompt = currentPrompt;
+    settings.prompt = $('#ct-prompt').val() || settings.prompt;
+    settings.targetLang = $('#ct-lang').val() || settings.targetLang;
+    settings.directModel = $('#ct-model').val() || settings.directModel;
+    settings.autoMode = $('#ct-auto-mode').val() || settings.autoMode;
+    settings.profile = $('#ct-profile').val() || '';
+    settings.customKey = $('#ct-key').val() || '';
+    
     extension_settings[extName] = settings;
     stContext.saveSettingsDebounced();
     translationCache = {}; 
 }
 
-// 💡 [v8.0.0] 중첩 방지 클리닝 (사진 15055.jpg 완벽 해결)
+// 💡 중첩 방지 클리닝 (사진 15055.jpg 완벽 해결 유지)
 function cleanResult(text) {
     if (!text) return "";
     return text.replace(/\[Alternative to:.*?\]/gs, "")
@@ -45,7 +50,7 @@ function cleanResult(text) {
 }
 
 /**
- * 핵심 번역 로직
+ * 핵심 번역 함수
  */
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     if (!text || text.trim() === "") return text;
@@ -58,7 +63,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
 
     const targetLang = isInput ? "English" : settings.targetLang;
     const basePrompt = isInput 
-        ? "Translate to natural English. Keep all tags." 
+        ? "Translate to natural English accurately. Keep all tags." 
         : settings.prompt.replace('{{language}}', targetLang);
 
     const cleanedPrev = cleanResult(previousTranslation);
@@ -69,7 +74,6 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
         let result = "";
         if (settings.profile && stContext.ConnectionManagerRequestService) {
             const response = await stContext.ConnectionManagerRequestService.sendRequest(settings.profile, [{ role: "user", content: promptWithText }], 4096);
-            if (!response) throw new Error("Connection Error");
             result = typeof response === 'string' ? response : (response.content || "");
         } 
         else {
@@ -99,15 +103,16 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
 }
 
 /**
- * 메시지 번역 실행
+ * 메시지 번역 실행 및 애니메이션 제어
  */
 async function processMessage(id, isInput = false) {
     const msgId = parseInt(id, 10); 
     const msg = stContext.chat[msgId];
     if (!msg) return;
 
-    // 아이콘 회전 애니메이션 적용
-    const btnIcon = $(`.mes[mesid="${msgId}"]`).find('.cat-emoji-icon');
+    // 💡 [v8.1.0] 고양이 회전 애니메이션 복구
+    const mesBlock = $(`.mes[mesid="${msgId}"]`);
+    const btnIcon = mesBlock.find('.cat-emoji-icon');
     btnIcon.addClass('cat-spin-anim');
     const startTime = Date.now();
 
@@ -129,9 +134,6 @@ async function processMessage(id, isInput = false) {
     }
 }
 
-/**
- * 원본 복구 로직 (사진 속 화살표 문제 해결)
- */
 function revertMessage(id) {
     const msgId = parseInt(id, 10);
     const msg = stContext.chat[msgId];
@@ -143,7 +145,7 @@ function revertMessage(id) {
 }
 
 /**
- * 💡 [v8.0.0] UI 상시 유지 로직 (렉 방지 및 전용 주입)
+ * 💡 [v8.1.0] UI 상시 고정 로직 (전용 주입)
  */
 function injectInputButtons() {
     const sendBut = $('#send_but:visible');
@@ -175,10 +177,7 @@ function injectInputButtons() {
             icon.removeClass('cat-spin-anim');
         }
     });
-    revertBtn.on('click', (e) => { 
-        e.preventDefault(); 
-        if (textAreaOriginal) $('#send_textarea').val(textAreaOriginal).trigger('input'); 
-    });
+    revertBtn.on('click', (e) => { e.preventDefault(); if (textAreaOriginal) $('#send_textarea').val(textAreaOriginal).trigger('input'); });
 }
 
 function setupUI() {
@@ -188,7 +187,7 @@ function setupUI() {
         let profileOptions = '';
         (stContext.extensionSettings?.connectionManager?.profiles || []).forEach(p => { profileOptions += `<option value="${p.id}">${p.name}</option>`; });
         
-        // [v8.0.0] 언어 리스트 풀패키지 복구
+        // 💡 [v8.1.0] 언어 리스트 풀패키지 100% 복구
         const uiHtml = `
             <div id="cat-trans-container" class="inline-drawer">
                 <div class="inline-drawer-header interactable" tabindex="0">
@@ -203,36 +202,45 @@ function setupUI() {
                             <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                             <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
                             <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                            <option value="gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro Exp</option>
+                            <option value="gemini-2.0-pro-exp-02-05">Gemini 2.0 Pro Exp (궁극)</option>
                         </select></div>
                     </div>
                     <div class="cat-setting-row"><label>자동 모드</label><select id="ct-auto-mode" class="text_pole"><option value="none">꺼짐</option><option value="input">입력만</option><option value="output">출력만</option><option value="both">둘 다</option></select></div>
                     <div class="cat-setting-row"><label>목표 언어</label><select id="ct-lang" class="text_pole">
-                        <option value="Korean">Korean</option><option value="English">English</option><option value="Japanese">Japanese</option>
-                        <option value="Chinese (Simplified)">Chinese (Simplified)</option><option value="Spanish">Spanish</option><option value="French">French</option><option value="German">German</option>
-                        <option value="Russian">Russian</option><option value="Vietnamese">Vietnamese</option>
+                        <option value="Korean">Korean</option>
+                        <option value="English">English</option>
+                        <option value="Japanese">Japanese</option>
+                        <option value="Chinese (Simplified)">Chinese (Simplified)</option>
+                        <option value="Chinese (Traditional)">Chinese (Traditional)</option>
+                        <option value="Spanish">Spanish</option>
+                        <option value="French">French</option>
+                        <option value="German">German</option>
+                        <option value="Russian">Russian</option>
+                        <option value="Vietnamese">Vietnamese</option>
+                        <option value="Thai">Thai</option>
                     </select></div>
                     <div class="cat-setting-row"><label>프롬프트</label><textarea id="ct-prompt" class="text_pole" rows="4">${settings.prompt}</textarea></div>
                     <button id="cat-save-btn" class="menu_button">설정 저장 🐱</button>
-                    <div style="font-size: 0.7em; opacity: 0.2; text-align: center; margin-top: 5px;">v8.0.0 Master Build</div>
+                    <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;">v8.1.0 Full Restore</div>
                 </div>
             </div>`;
         $('#extensions_settings').append(uiHtml);
         $('#cat-trans-container .inline-drawer-header').on('click', function() { $(this).next('.inline-drawer-content').slideToggle(200); $(this).find('.inline-drawer-toggle').toggleClass('fa-rotate-180'); });
-        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 저장 완료!"); });
+        
+        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 모든 설정과 언어가 저장되었습니다!"); });
+        
         $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); $('#direct-mode-settings').toggle(settings.profile === ''); saveSettings(); });
-        $('#ct-key').on('input', function() { settings.customKey = $(this).val(); });
-        $('#ct-model').val(settings.directModel).on('change', function() { settings.directModel = $(this).val(); saveSettings(); });
-        $('#ct-auto-mode').val(settings.autoMode).on('change', function() { settings.autoMode = $(this).val(); saveSettings(); });
-        $('#ct-lang').val(settings.targetLang).on('change', function() { settings.targetLang = $(this).val(); saveSettings(); });
+        $('#ct-model').val(settings.directModel);
+        $('#ct-auto-mode').val(settings.autoMode);
+        $('#ct-lang').val(settings.targetLang);
     }
 }
 
 jQuery(() => {
     setupUI();
     
-    // 💡 [v8.0.0] 부하 없는 상시 감시 로직 (0.3초)
-    setInterval(injectInputButtons, 300);
+    // 💡 부하 없는 상시 감시 로직 (0.25초)
+    setInterval(injectInputButtons, 250);
 
     stContext.eventSource.on(stContext.event_types.CHARACTER_MESSAGE_RENDERED, (d) => processMessage(typeof d === 'object' ? d.messageId : d, false));
     stContext.eventSource.on(stContext.event_types.USER_MESSAGE_RENDERED, (d) => processMessage(typeof d === 'object' ? d.messageId : d, true));
