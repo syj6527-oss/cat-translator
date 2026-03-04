@@ -249,7 +249,7 @@ function injectInputButtons() {
     target.before(catBtn).before(revertBtn);
     catBtn.on('click', async (e) => {
         e.preventDefault();
-let editArea = $('textarea.edit_textarea:visible').first();
+let editArea = $('textarea:visible').not('#send_textarea').first();
 let targetEl;
 
 if (editArea.length) {
@@ -259,7 +259,7 @@ if (editArea.length) {
 }
 
 let textToTranslate = targetEl.value.trim();
-        if (isTranslatingInput || !textToTranslate) return;
+        let editArea = $('textarea.edit_textarea:visible, textarea[name="mes_edit"]:visible').first();
         isTranslatingInput = true;
         catBtn.find('.cat-emoji-icon').addClass('cat-glow-anim');
         try {
@@ -268,12 +268,19 @@ let textToTranslate = targetEl.value.trim();
             const translated = await fetchTranslation(textToTranslate, true, (isRetry ? textAreaTranslated : null));
             if (translated) { 
                 textAreaTranslated = translated; 
-                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-                if (nativeSetter) nativeSetter.call(targetEl, translated);
-                else targetEl.value = translated;
-                // sendArea.val(translated);
-                targetEl.dispatchEvent(new Event('input', { bubbles: true }));
-                targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+                const nativeSetter = Object.getOwnPropertyDescriptor(
+    window.HTMLTextAreaElement.prototype,
+    "value"
+)?.set;
+
+if (nativeSetter) {
+    nativeSetter.call(targetEl, translated);
+} else {
+    targetEl.value = translated;
+}
+
+targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+targetEl.dispatchEvent(new Event('change', { bubbles: true }));
             }
         } finally { isTranslatingInput = false; $('#cat-input-btn .cat-emoji-icon').removeClass('cat-glow-anim'); }
     });
