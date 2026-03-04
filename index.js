@@ -159,7 +159,14 @@ Output:`;
                     generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
                 })
             });
-            result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+            // 🧠 [v17.0.0 갓피티 솔루션] 제미나이 2.0의 '생각(Thought)' 블록 걸러내기!
+            const parts = data.candidates?.[0]?.content?.parts || [];
+            
+            // 갓피티가 알려준 대로: thought 속성이 없거나, 가장 마지막에 있는 파트(실제 답변)를 가져옴!
+            const actualTextPart = parts.find(p => !p.thought) || parts[parts.length - 1]; 
+            
+            result = actualTextPart?.text?.trim() || "";
         }
         result = cleanResult(result);
         if (result && result !== cleanSourceText) translationCache[cacheKey] = result;
@@ -179,43 +186,42 @@ async function processMessage(id, isInput = false) {
     try {
         const mesBlock = $(`.mes[mesid="${msgId}"]`);
         
-        // 🎯 [갓피티 솔루션 1] 무조건 "현재 열려있는 수정창(edit_textarea)"을 찾는다!
-        let targetArea = mesBlock.find('textarea.edit_textarea:visible');
-        if (targetArea.length === 0) targetArea = mesBlock.find('textarea:visible');
+        // 🎯 [v17.0.0 갓피티 솔루션] 오직 '수정창(edit_textarea)'만 엄격하게 타겟팅!
+        let editArea = mesBlock.find('textarea.edit_textarea');
         
-        // 만약 사용자가 수정창(연필)을 열어놓은 상태라면:
-        if (targetArea.length > 0) {
-            const targetEl = targetArea[0];
+        // 만약 사용자가 연필을 눌러 수정창을 띄웠다면:
+        if (editArea.length > 0 && editArea.is(':visible')) {
+            const targetEl = editArea[0];
             
-            // 🎯 [갓피티 솔루션 2] msg.mes(원본) 말고, textarea 안에 있는 '현재 글씨'를 추출!
+            // 🔥 핵심: 예전 저장본 말고 '현재 텍스트박스 안에 적힌 글씨'를 긁어온다!
             let textToTranslate = targetEl.value.trim(); 
             
             if (textToTranslate && textToTranslate !== "") {
-                catNotify("🐱 텍스트 읽는 중...", "success"); 
+                catNotify("🐱 수정창 텍스트 번역 중...", "success"); 
                 
                 const translated = await fetchTranslation(textToTranslate, isInput, null);
                 
                 if (translated && translated !== textToTranslate) {
-                    // 🎯 [갓피티 솔루션 3] 번역된 값을 텍스트박스에 다시 주입!
+                    // 번역된 텍스트를 창에 꽂아넣기
                     const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
                     if (nativeSetter) {
                         nativeSetter.call(targetEl, translated);
                     } else {
                         targetEl.value = translated;
                     }
-                    targetArea.val(translated); // jQuery 2중 안전장치
+                    editArea.val(translated);
                     
-                    // 🎯 [갓피티 솔루션 4] 시스템에 강제 업데이트 통보! (가장 중요)
+                    // 💥 실리태번에 "화면 업데이트해라!" 강제 명령 (갓피티 코드)
                     targetEl.dispatchEvent(new Event('input', { bubbles: true }));
                     targetEl.dispatchEvent(new Event('change', { bubbles: true }));
                     
-                    catNotify("🎯 갓피티식 정밀 번역 완료!", "success");
+                    catNotify("🎯 갓피티 번역 완료!", "success");
                 }
-                return; // 🛑 수정창 번역 완료했으니 여기서 종료! (아래 일반 번역은 건너뜀)
+                return; // 🛑 수정창 처리 완료했으므로 아래 일반 번역 로직은 실행 안 함!
             }
         }
 
-        // --- 수정창이 안 열려있을 때 (일반 모드) ---
+        // --- 수정창이 안 열려있을 때 (일반 번역 모드) ---
         let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
         const translated = await fetchTranslation(textToTranslate, isInput, (isInput ? (msg.extra?.original_mes ? msg.mes : null) : msg.extra?.display_text));
         if (translated && translated !== textToTranslate) {
@@ -232,8 +238,8 @@ function revertMessage(id) {
     const msg = stContext.chat[msgId];
     if (!msg) return;
     
-    const targetArea = $(`.mes[mesid="${msgId}"]`).find('textarea:visible');
-    if (targetArea.length > 0) {
+    const editArea = $(`.mes[mesid="${msgId}"]`).find('textarea.edit_textarea:visible');
+    if (editArea.length > 0) {
         catNotify("🐱 수정 중에는 복구할 수 없습니다.", "warning");
         return;
     }
@@ -277,10 +283,9 @@ function injectInputButtons() {
     catBtn.on('click', async (e) => {
         e.preventDefault();
         
-        // 🎯 메인 입력창('#send_textarea')도 갓피티 로직 적용
         const sendArea = $('#send_textarea');
         const targetEl = sendArea[0];
-        let textToTranslate = targetEl.value.trim(); // 현재 입력창 내용 읽기!
+        let textToTranslate = targetEl.value.trim(); // 메인 입력창 글씨 바로 긁어오기!
         
         if (isTranslatingInput || !textToTranslate) return;
         
@@ -294,7 +299,6 @@ function injectInputButtons() {
             if (translated) { 
                 textAreaTranslated = translated; 
                 
-                // 값 강제 주입 & 이벤트 발생
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
                 if (nativeSetter) nativeSetter.call(targetEl, translated);
                 else targetEl.value = translated;
@@ -349,7 +353,7 @@ function setupUI() {
                 <div class="cat-setting-row cat-native-font"><label>번역 프롬프트</label><textarea id="ct-prompt" class="text_pole cat-native-font" rows="4">${settings.prompt}</textarea></div>
                 <div class="cat-setting-row cat-native-font"><label>고유명사 사전 (단어=번역어)</label><textarea id="ct-dictionary" class="text_pole cat-native-font" rows="3" placeholder="Ajax=아약스\nGhost=고스트">${settings.dictionary}</textarea></div>
                 <button id="cat-save-btn" class="menu_button cat-native-font" style="margin-top: 5px;">설정 저장 🐱</button>
-                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v16.9.0 The Oracle (God-GPT Version)</div>
+                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v17.0.0 God-GPT Ascension</div>
             </div>
         </div>`;
     $('#extensions_settings').append(uiHtml);
