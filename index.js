@@ -249,9 +249,16 @@ function injectInputButtons() {
     target.before(catBtn).before(revertBtn);
     catBtn.on('click', async (e) => {
         e.preventDefault();
-        const sendArea = $('#send_textarea');
-        const targetEl = sendArea[0];
-        let textToTranslate = targetEl.value.trim();
+let editArea = $('textarea.edit_textarea:visible').first();
+let targetEl;
+
+if (editArea.length) {
+    targetEl = editArea[0];
+} else {
+    targetEl = $('#send_textarea')[0];
+}
+
+let textToTranslate = targetEl.value.trim();
         if (isTranslatingInput || !textToTranslate) return;
         isTranslatingInput = true;
         catBtn.find('.cat-emoji-icon').addClass('cat-glow-anim');
@@ -264,7 +271,7 @@ function injectInputButtons() {
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
                 if (nativeSetter) nativeSetter.call(targetEl, translated);
                 else targetEl.value = translated;
-                sendArea.val(translated);
+                // sendArea.val(translated);
                 targetEl.dispatchEvent(new Event('input', { bubbles: true }));
                 targetEl.dispatchEvent(new Event('change', { bubbles: true }));
             }
