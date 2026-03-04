@@ -261,7 +261,7 @@ console.log("TRANSLATED:", translated);
         
 
         // --- 수정창이 안 열려있을 때 (일반 번역 모드) ---
-        textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
+        // textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
         const translated = await fetchTranslation(textToTranslate, isInput, (isInput ? (msg.extra?.original_mes ? msg.mes : null) : msg.extra?.display_text));
         if (translated && translated !== textToTranslate) {
             if (!msg.extra) msg.extra = {};
