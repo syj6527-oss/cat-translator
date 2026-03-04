@@ -202,8 +202,17 @@ async function processMessage(id, isInput = false) {
         let editArea = mesBlock.find('textarea.edit_textarea');
         
         // 만약 사용자가 연필을 눌러 수정창을 띄웠다면:
-        if (editArea.length > 0 && editArea.is(':visible')) {
-            const targetEl = editArea[0];
+        let targetEl;
+
+if (editArea.length > 0 && editArea.is(':visible')) {
+
+    targetEl = editArea[0];
+
+} else {
+
+    targetEl = $('#send_textarea')[0];
+
+}
             
             // 🔥 핵심: 예전 저장본 말고 '현재 텍스트박스 안에 적힌 글씨'를 긁어온다!
 let textToTranslate = $('#send_textarea').val()?.trim() || targetEl.value.trim();
@@ -332,7 +341,7 @@ let targetEl = editArea.length
 
 console.log("TARGET:", targetEl);
 
-let textToTranslate = $('#send_textarea').val()?.trim() || targetEl.value.trim();
+let textToTranslate = $('#send_textarea').val()?.trim() || (targetEl ? targetEl.value.trim() : "");
 console.log("INPUT TEXT:", textToTranslate); // 메인 입력창 글씨 바로 긁어오기!
 
 const sourceLang = detectLang(textToTranslate);
