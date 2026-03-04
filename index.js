@@ -283,7 +283,7 @@ function injectInputButtons() {
     catBtn.on('click', async (e) => {
         e.preventDefault();
         
-let editArea = $('textarea:visible').not('#send_textarea').first();
+let editArea = mesBlock.find('textarea:visible').first();
 let targetEl;
 
 if (editArea.length) {
