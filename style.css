@@ -2,26 +2,35 @@
 .cat-setting-row > label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 2px; }
 
 #cat-trans-container .inline-drawer-icon { display: none !important; width: 0 !important; padding: 0 !important; margin: 0 !important; }
-#cat-trans-container .inline-drawer-header { display: flex !important; align-items: center !important; justify-content: space-between !important; cursor: pointer !important; padding: 0.5em 0.8em !important; min-height: 3em !important; }
-#cat-trans-container .inline-drawer-title { display: flex !important; align-items: center !important; gap: 10px !important; flex: 1 !important; font-size: 1.1em; }
-#cat-trans-container .inline-drawer-toggle { transition: transform 0.2s; opacity: 0.7; }
-.fa-rotate-180 { transform: rotate(180deg) !important; }
+#cat-drawer-header { display: flex !important; align-items: center !important; justify-content: space-between !important; cursor: pointer !important; padding: 0.5em 0.8em !important; min-height: 3em !important; }
+#cat-drawer-header .inline-drawer-title { display: flex !important; align-items: center !important; gap: 10px !important; flex: 1 !important; font-size: 1.1em; }
+#cat-drawer-toggle { transition: transform 0.2s ease-in-out; opacity: 0.7; }
+
+/* 💡 설정창 화살표 충돌 완벽 방지 (새로운 클래스명 사용) */
+.cat-rotate-180 { transform: rotate(180deg) !important; }
 
 #cat-save-btn { background-color: rgba(168, 199, 250, 0.15); border: 1px solid #a8c7fa; color: #a8c7fa; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; transition: all 0.2s; }
 #cat-save-btn:hover { background-color: rgba(168, 199, 250, 0.3); }
 
 #cat-input-btn, #cat-input-revert-btn { display: inline-flex; vertical-align: middle; }
 
-/* 💡 고양이 목관절 보호: 중심축 고정 및 애니메이션 속도 완화 */
+/* 💡 고양이 목관절 완치: 래퍼(Wrapper)로 중심 강제 고정 */
+.cat-emoji-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4em;
+    height: 1.4em;
+    vertical-align: middle;
+}
+
 .cat-emoji-icon { 
     display: inline-block; 
     transition: transform 0.2s; 
-    transform-origin: center center; /* 중심축 정확히 고정 */
-    line-height: 1; /* 덜덜거림 방지 */
 }
 
-/* 속도를 1.2s -> 2.0s로 부드럽게 조정 */
+/* 회전을 래퍼(Wrapper)에 걸어주어 덜덜거림 원천 차단 */
 .cat-spin-anim { animation: cat-spin 2.0s infinite linear !important; }
 @keyframes cat-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-.cat-mes-trans-btn:hover .cat-emoji-icon { transform: scale(1.2); }
+.cat-mes-trans-btn:hover .cat-emoji-wrapper { transform: scale(1.2); }
