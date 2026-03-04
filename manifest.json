@@ -1,8 +1,8 @@
 {
     "name": "cat-translator",
     "display_name": "🐱트랜스레이터",
-    "version": "16.6.0",
-    "description": "The Sniper: GPT's Target Override & Edit Mode Mastery",
+    "version": "16.7.0",
+    "description": "The Oracle: GPT-Powered Ultimate UI Event Trigger & Perfect Targeting",
     "author": "ST User",
     "js": "index.js",
     "css": "style.css"
