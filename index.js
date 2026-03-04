@@ -9,7 +9,7 @@ let textAreaOriginal = "";
 let textAreaTranslated = "";
 let isTranslatingInput = false;
 
-// 💊 알림창
+// 💊 상태 중계용 알림창
 function catNotify(message, type = 'success') {
     $('.cat-notification').remove();
     const bgColor = type === 'success' ? '#2ecc71' : (type === 'warning' ? '#f1c40f' : '#e74c3c');
@@ -55,7 +55,7 @@ function cleanResult(text) {
     return text.replace(/^(번역|Translation|Output):\s*/gi, "").replace(/\{+(.*?)\}+/g, "$1").trim();
 }
 
-function applyPreReplace(text, isInput) {
+function applyPreReplace(text, isToEnglish) {
     if (!settings.dictionary || settings.dictionary.trim() === "") return text;
     let dictLines = settings.dictionary.split('\n').filter(l => l.includes('='));
     if (dictLines.length === 0) return text;
@@ -67,8 +67,8 @@ function applyPreReplace(text, isInput) {
         let parts = line.split('=');
         if (parts.length === 2) {
             let orig = parts[0].trim(), trans = parts[1].trim();
-            let searchStr = isInput ? trans : orig;
-            let replaceStr = isInput ? orig : trans;
+            let searchStr = isToEnglish ? trans : orig;
+            let replaceStr = isToEnglish ? orig : trans;
             if (searchStr && replaceStr) {
                 let escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 processedText = processedText.replace(new RegExp(escapeRegExp(searchStr), 'gi'), replaceStr);
@@ -78,16 +78,23 @@ function applyPreReplace(text, isInput) {
     return processedText;
 }
 
-async function fetchTranslation(text, isInput = false, previousTranslation = null) {
+// 🚀 스마트 번역 API (자동 언어 감지 & 생각 필터링)
+async function fetchTranslation(text, isInputHint = false, previousTranslation = null) {
     if (!text || text.trim() === "") return text;
-    const cacheKey = `${settings.targetLang}_${isInput ? 'toEn' : 'toTarget'}_${text.trim()}`;
+    
+    // 언어 감지
+    const korCount = (text.match(/[가-힣]/g) || []).length;
+    const engCount = (text.match(/[a-zA-Z]/g) || []).length;
+    const isToEnglish = korCount > engCount; 
+
+    const targetLang = isToEnglish ? "English" : settings.targetLang;
+    const cacheKey = `${targetLang}_${text.trim()}`;
     if (!previousTranslation && translationCache[cacheKey]) return translationCache[cacheKey];
 
-    const targetLang = isInput ? "English" : settings.targetLang;
-    let preReplacedText = applyPreReplace(text.trim(), isInput);
+    let preReplacedText = applyPreReplace(text.trim(), isToEnglish);
     
-    let promptWithText = isInput 
-        ? `Translate ONLY to English.\nInput: ${preReplacedText}\nOutput:`
+    let promptWithText = isToEnglish 
+        ? `Translate the following text to English exactly. Output ONLY the raw English translation without any explanations.\nInput: ${preReplacedText}\nOutput:`
         : `${settings.prompt.replace('{{language}}', targetLang)}\nInput: ${preReplacedText}\nOutput:`;
 
     try {
@@ -100,16 +107,25 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             if (!apiKey) { catNotify("🐱 API 키 오류!", "error"); return text; }
             
             const model = settings.directModel.startsWith('models/') ? settings.directModel : `models/${settings.directModel}`;
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ role: "user", parts: [{ text: promptWithText }] }],
-                    generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
-                })
-            });
-            const data = await response.json();
             
+            const tryFetch = async (retries = 1) => {
+                try {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/${model}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ role: "user", parts: [{ text: promptWithText }] }],
+                            generationConfig: { temperature: 0.0, maxOutputTokens: 8192 }
+                        })
+                    });
+                    return await res.json();
+                } catch(e) {
+                    if(retries > 0) return await tryFetch(retries - 1);
+                    throw e;
+                }
+            };
+            
+            const data = await tryFetch();
             const parts = data.candidates?.[0]?.content?.parts || [];
             const actualPart = parts.find(p => !p.thought) || parts[parts.length - 1]; 
             result = actualPart?.text?.trim() || "";
@@ -136,36 +152,45 @@ async function processMessage(id, isInput = false) {
     try {
         const mesBlock = $(`.mes[mesid="${msgId}"]`);
         
-        // 🎯 [v17.3.0] 지피티의 최종 결론: 무적의 다중 타겟팅 콤보!
+        // 🎯 [v17.6.0] 갓피티의 궁극 오의: 실리태번 변덕 무시하고 텍스트박스 강제 멱살잡기!!!
         let editArea = mesBlock.find('textarea.edit_textarea:visible, textarea.mes_edit_textarea:visible, textarea:visible').first();
         
         if (editArea.length > 0) {
             let currentText = editArea.val().trim();
-            if (!currentText) return;
+            if (!currentText) {
+                catNotify("❌ 텍스트박스가 비어있습니다.", "warning");
+                return;
+            }
 
-            catNotify("🐱 수정창 번역 중...", "success");
+            catNotify("🐱 1/3: 갓피티 추적기! 텍스트박스 포착!", "success");
             const translated = await fetchTranslation(currentText, isInput, null);
             
             if (translated && translated !== currentText) {
+                catNotify("🐱 2/3: 번역 완료! 텍스트 꽂는 중...", "success");
+                
                 const targetEl = editArea[0];
                 
+                // 네이티브 권한으로 찌르기
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
                 if (nativeSetter) {
                     nativeSetter.call(targetEl, translated);
                 } else {
                     targetEl.value = translated;
                 }
-                editArea.val(translated); 
+                editArea.val(translated);
                 
+                // 시스템에 소문내기
                 targetEl.dispatchEvent(new Event('input', { bubbles: true }));
                 targetEl.dispatchEvent(new Event('change', { bubbles: true }));
                 
-                catNotify("🎯 수정창 번역 완료!", "success");
+                catNotify("🎯 3/3: 수정창 덮어쓰기 대성공!", "success");
+            } else {
+                catNotify("⚠️ 번역 결과가 원문과 동일합니다.", "warning");
             }
-            return; 
+            return; // 🛑 수정창 찾았으면 여기서 끝!
         }
 
-        // 일반 모드
+        // 📝 일반 모드 (수정창이 없을 때)
         let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
         const translated = await fetchTranslation(textToTranslate, isInput, (isInput ? (msg.extra?.original_mes ? msg.mes : null) : msg.extra?.display_text));
         
@@ -187,7 +212,6 @@ function revertMessage(id) {
     const msg = stContext.chat[msgId];
     if (!msg) return;
     
-    // 🎯 복구 버튼도 동일하게 무적 타겟팅 적용
     if ($(`.mes[mesid="${msgId}"]`).find('textarea.edit_textarea:visible, textarea.mes_edit_textarea:visible, textarea:visible').length > 0) {
         catNotify("🐱 수정 중에는 복구할 수 없습니다.", "warning");
         return;
@@ -264,13 +288,13 @@ function setupUI() {
                     </select></div>
                 </div>
                 <div class="cat-setting-row cat-native-font"><label>자동 모드</label><select id="ct-auto-mode" class="text_pole cat-native-font"><option value="none">꺼짐</option><option value="input">입력만</option><option value="output">출력만</option><option value="both">둘 다</option></select></div>
-                <div class="cat-setting-row cat-native-font"><label>목표 언어</label><select id="ct-lang" class="text_pole cat-native-font">
+                <div class="cat-setting-row cat-native-font"><label>목표 언어 (AI 기본)</label><select id="ct-lang" class="text_pole cat-native-font">
                     <option value="Korean">Korean</option><option value="English">English</option><option value="Japanese">Japanese</option>
                 </select></div>
                 <div class="cat-setting-row cat-native-font"><label>번역 프롬프트</label><textarea id="ct-prompt" class="text_pole cat-native-font" rows="4">${settings.prompt}</textarea></div>
                 <div class="cat-setting-row cat-native-font"><label>사전 (A=B)</label><textarea id="ct-dictionary" class="text_pole cat-native-font" rows="3">${settings.dictionary}</textarea></div>
                 <button id="cat-save-btn" class="menu_button cat-native-font" style="margin-top: 5px;">설정 저장 🐱</button>
-                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v17.3.0 GPT's Final Target</div>
+                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v17.6.0 The Legacy of GPT</div>
             </div>
         </div>`;
     $('#extensions_settings').append(uiHtml);
