@@ -283,13 +283,22 @@ function injectInputButtons() {
     catBtn.on('click', async (e) => {
         e.preventDefault();
         
+let mesBlock = (typeof msgId !== "undefined" && msgId)
+    ? $(`.mes[mesid="${msgId}"]`)
+    : null;
+
 let editArea = mesBlock && mesBlock.length
     ? mesBlock.find('textarea:visible').first()
     : $();
 
+let sendBox =
+    $('#send_textarea')[0] ||
+    $('#send_text')[0] ||
+    $('#chat_textarea')[0];
+
 let targetEl = editArea.length
     ? editArea[0]
-    : $('#send_textarea')[0];
+    : sendBox;
 
 console.log("TARGET:", targetEl);
 
