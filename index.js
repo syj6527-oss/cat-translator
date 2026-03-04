@@ -328,7 +328,8 @@ let targetEl = editArea.length
 
 console.log("TARGET:", targetEl);
 
-let textToTranslate = targetEl.value.trim(); // 메인 입력창 글씨 바로 긁어오기!
+let textToTranslate = targetEl.value.trim();
+console.log("INPUT TEXT:", textToTranslate); // 메인 입력창 글씨 바로 긁어오기!
 
 const sourceLang = detectLang(textToTranslate);
 
