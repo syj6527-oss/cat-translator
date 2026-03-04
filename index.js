@@ -4,7 +4,7 @@ import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 const extName = "cat-translator";
 const stContext = getContext();
 
-// 전역 상태
+// 전역 상태 관리
 let translationCache = {};
 let textAreaOriginal = "";
 let textAreaTranslated = "";
@@ -27,7 +27,7 @@ if (!settings.prompt || settings.prompt.trim() === "") {
     settings.prompt = defaultPrompt;
 }
 
-// 저장 로직 (유실 방지)
+// 설정 저장 (DOM 동기화 포함)
 function saveSettings() {
     const currentPrompt = $('#ct-prompt').val();
     if (currentPrompt !== undefined) settings.prompt = currentPrompt;
@@ -36,7 +36,7 @@ function saveSettings() {
     translationCache = {}; 
 }
 
-// 중첩 태그 청소 로직 (v6.1.0 fix 유지)
+// 결과물 클리닝 (중첩 방지)
 function cleanResult(text) {
     if (!text) return "";
     return text
@@ -46,10 +46,13 @@ function cleanResult(text) {
         .trim();
 }
 
+/**
+ * 번역 핵심 로직
+ */
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     if (!text || text.trim() === "") return text;
-
     const cacheKey = `${settings.targetLang}_${isInput ? 'toEn' : 'toTarget'}_${text}`;
+    
     if (!previousTranslation && translationCache[cacheKey]) {
         toastr.info("🐱 캐시 사용: 토큰을 아꼈습니다!");
         return translationCache[cacheKey];
@@ -57,7 +60,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
 
     const targetLang = isInput ? "English" : settings.targetLang;
     const basePrompt = isInput 
-        ? "Translate the following text into natural English. Preserve formatting." 
+        ? "Translate to natural English. Preserve format." 
         : settings.prompt.replace('{{language}}', targetLang);
 
     const cleanedPrev = cleanResult(previousTranslation);
@@ -113,6 +116,9 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
     }
 }
 
+/**
+ * 메시지 처리 로직
+ */
 async function processMessage(id, isInput = false) {
     const msgId = parseInt(id, 10); 
     const msg = stContext.chat[msgId];
@@ -146,17 +152,22 @@ function revertMessage(id) {
     if (changed) stContext.updateMessageBlock(msgId, msg);
 }
 
-// 💡 [v6.2.0] 입력창 UI 상시 유지 로직
+// 💡 [v6.3.0] 입력창 버튼 강제 주입 함수 (중복 체크 강화)
 function injectInputButtons() {
-    if ($('#cat-input-btn').length) return; // 이미 있으면 패스
+    // 이미 버튼이 존재하면 중단
+    if ($('#cat-input-btn').length > 0) return;
 
+    // 현재 활성화된 버튼 찾기 (Send 또는 Stop)
     const sendBut = $('#send_but');
-    if (!sendBut.length) return;
+    const interruptBut = $('#interrupt_but');
+    const target = (sendBut.is(':visible') ? sendBut : (interruptBut.is(':visible') ? interruptBut : null));
+    
+    if (!target || !target.length) return;
 
     const catBtn = $('<div id="cat-input-btn" title="고양이 번역" style="cursor:pointer; margin-right:2px; display:inline-flex; align-items:center; font-size:1.3em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
     const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본 복구" style="cursor:pointer; margin-right:4px; color:#ffb4a2; font-size:1.1em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
     
-    sendBut.before(catBtn).before(revertBtn);
+    target.before(catBtn).before(revertBtn);
     
     catBtn.on('click', async () => {
         const area = $('#send_textarea');
@@ -211,7 +222,7 @@ function setupUI() {
                         <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;"><input type="checkbox" id="ct-filter-code"> Filter Code Block</label>
                     </div>
                     <div class="cat-setting-row" style="margin-top: 15px;"><button id="cat-save-btn" class="menu_button">설정 저장 🐱</button></div>
-                    <div style="font-size: 0.8em; opacity: 0.2; text-align: center; margin-top: 5px;">v6.2.0 Ultra Stable Build</div>
+                    <div style="font-size: 0.8em; opacity: 0.1; text-align: center; margin-top: 5px;">v6.3.0 Eternal Build</div>
                 </div>
             </div>
         `;
@@ -231,9 +242,12 @@ function setupUI() {
 jQuery(() => {
     setupUI();
     
-    // 💡 [v6.2.0] 실시간 UI 감시: 답변 출력 중에도 버튼을 계속 다시 그림
+    // 💡 [v6.3.0] 더 공격적인 감시: 하단바 전체를 감시하여 버튼 교체 즉시 대응
     const observer = new MutationObserver(() => { injectInputButtons(); });
-    observer.observe(document.querySelector('#send_container') || document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // 💡 [v6.3.0] 예비 로직: 0.5초마다 버튼 유무 확인 (최종 보험)
+    setInterval(injectInputButtons, 500);
 
     stContext.eventSource.on(stContext.event_types.CHARACTER_MESSAGE_RENDERED, (d) => { const msgId = typeof d === 'object' ? d.messageId : d; if(['output', 'both'].includes(settings.autoMode)) processMessage(msgId, false); });
     stContext.eventSource.on(stContext.event_types.USER_MESSAGE_RENDERED, (d) => { const msgId = typeof d === 'object' ? d.messageId : d; if(['input', 'both'].includes(settings.autoMode)) processMessage(msgId, true); });
