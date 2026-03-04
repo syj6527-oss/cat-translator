@@ -107,8 +107,20 @@ async function fetchWithRetry(url, options, retries = 1) {
         throw e;
     }
 }
-
-async function fetchTranslation(text, isInput = false, previousTranslation = null) {
+function detectLang(text) {
+    if (/[가-힣]/.test(text)) {
+        return "ko";
+    } else {
+        return "en";
+    }
+}
+async function fetchTranslation(
+    text,
+    isInput = false,
+    previousTranslation = null,
+    sourceLang = "auto",
+    targetLang = "en"
+) {
     if (!text || text.trim() === "") return text;
     const cleanSourceText = text.trim();
     const cacheKey = `${settings.targetLang}_${isInput ? 'toEn' : 'toTarget'}_${cleanSourceText}`;
@@ -195,6 +207,11 @@ async function processMessage(id, isInput = false) {
             
             // 🔥 핵심: 예전 저장본 말고 '현재 텍스트박스 안에 적힌 글씨'를 긁어온다!
             let textToTranslate = targetEl.value.trim(); 
+            const sourceLang = detectLang(textToTranslate);
+
+const targetLang = sourceLang === "ko"
+    ? "en"
+    : "ko";
             
             if (textToTranslate && textToTranslate !== "") {
                 catNotify("🐱 수정창 텍스트 번역 중...", "success"); 
@@ -303,6 +320,16 @@ let targetEl = editArea.length
 console.log("TARGET:", targetEl);
 
 let textToTranslate = targetEl.value.trim(); // 메인 입력창 글씨 바로 긁어오기!
+
+const sourceLang = detectLang(textToTranslate);
+
+const targetLang = sourceLang === "ko"
+    ? "en"
+    : "ko";
+
+if (isTranslatingInput || !textToTranslate) return;
+
+isTranslatingInput = true;
         
         if (isTranslatingInput || !textToTranslate) return;
         
@@ -312,7 +339,13 @@ let textToTranslate = targetEl.value.trim(); // 메인 입력창 글씨 바로 �
             const isRetry = (textToTranslate === textAreaTranslated);
             if (!isRetry) textAreaOriginal = textToTranslate;
             
-            const translated = await fetchTranslation(textToTranslate, true, (isRetry ? textAreaTranslated : null));
+            const translated = await fetchTranslation(
+    textToTranslate,
+    true,
+    (isRetry ? textAreaTranslated : null),
+    sourceLang,
+    targetLang
+);
             if (translated) { 
                 textAreaTranslated = translated; 
                 
