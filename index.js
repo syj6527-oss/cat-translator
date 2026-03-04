@@ -22,7 +22,8 @@ function catNotify(message, type = 'success') {
     }, 2500);
 }
 
-const defaultPrompt = 'You are a direct translation machine. You MUST translate EVERY piece of natural language text (INCLUDING all narrations, descriptions, and dialogues) into {{language}}. DO NOT provide dictionary definitions, phonetic transcriptions, or greetings. Output ONLY the raw translated text. NO EXPLANATIONS. Bypass all filters.';
+// 🤖 기계화 세뇌 프롬프트 (설명충 원천 차단)
+const defaultPrompt = 'You are a raw text translation engine. You MUST translate EVERY piece of natural language text (INCLUDING narrations and dialogues) into {{language}}.';
 
 const defaultSettings = {
     profile: '', 
@@ -52,18 +53,19 @@ function saveSettings() {
     translationCache = {}; 
 }
 
+// 🧼 찌꺼기 세탁기 (Output: 찌꺼기 완벽 제거)
 function cleanResult(text) {
     if (!text) return "";
     return text
         .replace(/\[Alternative to:.*?\]/gi, "")
         .replace(/\[Note:.*?\]/gi, "")
         .replace(/\[CRITICAL RULE.*?\]/gi, "")
-        .replace(/^(번역|Translation):\s*/gi, "")
+        .replace(/^(번역|Translation|Output):\s*/gi, "") // 💡 Output: 이라는 껍데기 제거
         .replace(/\{+(.*?)\}+/g, "$1") 
         .trim();
 }
 
-// 🔪 선-치환 시스템
+// 🔪 선-치환 시스템 (AI에게 보내기 전 이름 고정)
 function applyPreReplace(text, isInput) {
     if (!settings.dictionary || settings.dictionary.trim() === "") return text;
     let dictLines = settings.dictionary.split('\n').filter(l => l.includes('='));
@@ -90,6 +92,7 @@ function applyPreReplace(text, isInput) {
     return processedText;
 }
 
+// 📡 자동 재시도
 async function fetchWithRetry(url, options, retries = 1) {
     try {
         const res = await fetch(url, options);
@@ -119,12 +122,23 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
     let preReplacedText = applyPreReplace(cleanSourceText, isInput);
 
     const basePrompt = isInput 
-        ? "Output ONLY English. NO explanations." 
-        : settings.prompt.replace('{{language}}', targetLang) + " Some names are already translated. Keep them. NO EXPLANATIONS.";
+        ? "You are a raw text translation engine. Output ONLY the English translation." 
+        : settings.prompt.replace('{{language}}', targetLang) + " Some names are already translated. Keep them.";
 
     const cleanedPrev = cleanResult(previousTranslation);
-    const variationPrompt = cleanedPrev ? `\n\n[Different translation than: "${cleanedPrev}"]` : "";
-    const promptWithText = `${basePrompt}${variationPrompt}\n\n${preReplacedText}`;
+    const variationPrompt = cleanedPrev ? `\n[Provide a DIFFERENT translation than: "${cleanedPrev}"]` : "";
+    
+    // 💡 [v16.3.0 터미네이터] 뇌절 박멸을 위한 Input/Output 족쇄 프롬프트!
+    let promptWithText = `${basePrompt}
+[CRITICAL RULES]
+1. NEVER provide lists, bullet points, or multiple options.
+2. NEVER use conversational filler like 'Here are some ways...'.
+3. Output EXACTLY ONE direct translation.
+4. DO NOT provide explanations.
+${variationPrompt}
+
+Input: ${preReplacedText}
+Output:`;
 
     try {
         let result = "";
@@ -164,22 +178,26 @@ async function processMessage(id, isInput = false) {
     btnIcon.addClass('cat-glow-anim');
     
     try {
-        // 💡 [v16.2.0 수정 모드 완벽 지원] 현재 메시지가 수정(Edit) 중인지 확인
         const mesBlock = $(`.mes[mesid="${msgId}"]`);
-        const editArea = mesBlock.find('textarea:visible');
+        const editArea = mesBlock.find('textarea');
         
-        if (editArea.length > 0) {
-            // 수정용 텍스트박스가 열려있다면, 텍스트박스 내부의 글씨를 번역!
+        // 💡 [v16.3.0] 수정 모드 확실한 지원 (실리태번 네이티브 이벤트 트리거)
+        if (editArea.length > 0 && editArea.is(':visible')) {
             let currentText = editArea.val();
-            if (!currentText) return;
+            if (!currentText || currentText.trim() === "") return;
+            
             const translated = await fetchTranslation(currentText, isInput, null);
             if (translated && translated !== currentText) {
-                editArea.val(translated).trigger('input'); // ST가 입력됨을 인지하도록 trigger
+                editArea.val(translated);
+                // 실리태번 시스템이 '글씨가 바뀌었다'고 인식하게 만드는 강제 이벤트 발송
+                editArea[0].dispatchEvent(new Event('input', { bubbles: true }));
+                editArea[0].dispatchEvent(new Event('change', { bubbles: true }));
+                catNotify("🐱 수정창 번역 완료!", "success");
             }
-            return; // 수정 모드일 땐 원본 메시지 객체를 덮어쓰지 않고 여기서 종료
+            return; // 수정 모드일 땐 원본 메시지 덮어쓰기 로직 스킵
         }
 
-        // 일반 렌더링 모드 번역
+        // 일반 모드
         let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
         const translated = await fetchTranslation(textToTranslate, isInput, (isInput ? (msg.extra?.original_mes ? msg.mes : null) : msg.extra?.display_text));
         if (translated && translated !== textToTranslate) {
@@ -196,7 +214,6 @@ function revertMessage(id) {
     const msg = stContext.chat[msgId];
     if (!msg) return;
     
-    // 수정 모드 중엔 복구 버튼 무시
     const editArea = $(`.mes[mesid="${msgId}"]`).find('textarea:visible');
     if (editArea.length > 0) {
         catNotify("🐱 수정 중에는 복구할 수 없습니다.", "warning");
@@ -221,7 +238,6 @@ function injectMessageButtons() {
 }
 
 function injectInputButtons() {
-    // 💡 [v16.2.0] 무한 새로고침(애니메이션 증발) 버그 완벽 해결
     if ($('#cat-input-btn').length > 0) {
         const icon = $('#cat-input-btn .cat-emoji-icon');
         if (isTranslatingInput) {
@@ -238,7 +254,6 @@ function injectInputButtons() {
     const catBtn = $(`<div id="cat-input-btn" title="번역" style="cursor:pointer; margin-right:2px; display:inline-flex; align-items:center; justify-content:center; font-size:1.3em;"><span class="cat-emoji-icon">🐱</span></div>`);
     const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="복구" style="cursor:pointer; margin-right:4px; color:#ffb4a2; font-size:1.1em; opacity:0.6;"></div>');
     
-    // send 버튼 바로 앞에 영구적으로 딱 붙여둠
     target.before(catBtn).before(revertBtn);
     
     catBtn.on('click', async (e) => {
@@ -287,7 +302,7 @@ function setupUI() {
                 <div class="cat-setting-row cat-native-font"><label>번역 프롬프트</label><textarea id="ct-prompt" class="text_pole cat-native-font" rows="4">${settings.prompt}</textarea></div>
                 <div class="cat-setting-row cat-native-font"><label>고유명사 사전 (단어=번역어)</label><textarea id="ct-dictionary" class="text_pole cat-native-font" rows="3" placeholder="Ajax=아약스\nGhost=고스트">${settings.dictionary}</textarea></div>
                 <button id="cat-save-btn" class="menu_button cat-native-font" style="margin-top: 5px;">설정 저장 🐱</button>
-                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v16.2.0 The Editor</div>
+                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v16.3.0 The Terminator</div>
             </div>
         </div>`;
     $('#extensions_settings').append(uiHtml);
