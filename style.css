@@ -1,4 +1,4 @@
-/* [v15.5.0] 순정 폰트 강제 주입 */
+/* 🎨 100% 네이티브 폰트 동기화 (명조체 탈출) */
 .cat-native-font {
     font-family: var(--smart-font, 'Noto Sans', 'Segoe UI', sans-serif) !important;
 }
@@ -12,13 +12,14 @@
 
 #cat-save-btn { background-color: rgba(168, 199, 250, 0.15); border: 1px solid #a8c7fa; color: #a8c7fa; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
 
-/* 💡 GPU 가속 적용으로 덜덜거림 방지 */
+/* 🚀 GPU 하드웨어 가속 강제할당 (파킨슨 덜덜거림 완치) */
 .cat-emoji-icon { 
     display: inline-block; 
     line-height: 1;
     transition: all 0.2s;
     will-change: transform, filter;
-    transform: translateZ(0);
+    transform: translateZ(0); 
+    -webkit-backface-visibility: hidden;
 }
 
 .cat-glow-anim { 
@@ -31,6 +32,7 @@
     100% { transform: scale(1.2) translateZ(0); filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.9)); background-color: rgba(255, 215, 0, 0.2); }
 }
 
+/* 💊 절대 찢어지지 않는 둥근 알약 팝업 */
 .cat-notification {
     position: fixed;
     top: -60px;
@@ -39,7 +41,6 @@
     padding: 12px 24px;
     border-radius: 30px; 
     color: white;
-    font-family: inherit;
     font-weight: bold;
     font-size: 14px;
     z-index: 2147483647 !important;
@@ -50,5 +51,6 @@
     max-width: 85vw; 
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: center;
 }
 .cat-notification.show { top: 25px; }
