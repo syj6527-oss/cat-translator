@@ -1,8 +1,8 @@
 {
     "name": "cat-translator",
     "display_name": "🐱트랜스레이터",
-    "version": "6.5.0",
-    "description": "Cat Translator Pro (Lightweight & Touch Safety Fix)",
+    "version": "7.1.0",
+    "description": "Cat Translator Pro (Final Stable Build: Anti-Lag & Perfect Sync)",
     "author": "ST User",
     "js": "index.js",
     "css": "style.css"
