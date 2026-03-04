@@ -1,14 +1,12 @@
 .cat-setting-row { margin-bottom: 8px; }
 .cat-setting-row > label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 2px; }
 
-#cat-trans-container .inline-drawer-icon { display: none !important; }
 #cat-trans-container .inline-drawer-header { display: flex !important; align-items: center !important; justify-content: space-between !important; cursor: pointer !important; padding: 0.5em 0.8em !important; min-height: 3em !important; }
 #cat-trans-container .inline-drawer-title { display: flex !important; align-items: center !important; gap: 10px !important; flex: 1 !important; font-size: 1.1em; }
 #cat-trans-container .inline-drawer-toggle { transition: transform 0.2s; opacity: 0.7; }
-.fa-rotate-180 { transform: rotate(180deg); }
+.fa-rotate-180 { transform: rotate(180deg) !important; }
 
 #cat-save-btn { background-color: rgba(168, 199, 250, 0.15); border: 1px solid #a8c7fa; color: #a8c7fa; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
-#cat-save-btn:hover { background-color: rgba(168, 199, 250, 0.3); }
 
 #cat-input-btn, #cat-input-revert-btn { display: inline-flex; vertical-align: middle; }
 .cat-spin-anim { display: inline-block; animation: cat-spin 1.2s infinite linear; }
