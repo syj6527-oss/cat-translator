@@ -130,7 +130,7 @@ async function fetchTranslation(
         return translationCache[cacheKey];
     }
 
-    const targetLang = isInput ? "English" : settings.targetLang;
+    // const targetLang = isInput ? "English" : settings.targetLang;
     let preReplacedText = applyPreReplace(cleanSourceText, isInput);
 
     const basePrompt = isInput 
