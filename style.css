@@ -1,36 +1,59 @@
-.cat-setting-row { margin-bottom: 8px; }
+/* 💡 [v12.1.0] 실리태번 순정 폰트를 상속(inherit)받아 위화감 제거 */
+.cat-setting-row { margin-bottom: 8px; font-family: inherit; }
 .cat-setting-row > label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 2px; }
 
-#cat-trans-container .inline-drawer-icon { display: none !important; }
-#cat-drawer-header { display: flex !important; align-items: center; justify-content: space-between; cursor: pointer; padding: 0.5em 0.8em; min-height: 3em; }
+#cat-drawer-header { display: flex !important; align-items: center !important; justify-content: space-between !important; cursor: pointer !important; padding: 0.5em 0.8em !important; min-height: 3em !important; }
 #cat-drawer-header .inline-drawer-title { display: flex; align-items: center; gap: 10px; flex: 1; font-size: 1.1em; }
-#cat-drawer-toggle { transition: transform 0.2s; opacity: 0.7; }
-.cat-rotate-180 { transform: rotate(180deg) !important; }
+
+/* 화살표 애니메이션을 순정 방식으로 적용하여 클래스 꼬임 방지 */
+#cat-drawer-toggle { transition: transform 0.2s ease-in-out; opacity: 0.7; }
 
 #cat-save-btn { background-color: rgba(168, 199, 250, 0.15); border: 1px solid #a8c7fa; color: #a8c7fa; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
-#cat-input-btn, #cat-input-revert-btn { display: inline-flex; vertical-align: middle; }
 
-/* 💡 순정 고양이 이모지 세팅 */
+/* 고양이 기본 세팅 */
 .cat-emoji-icon { 
     display: inline-block; 
     line-height: 1;
-    transition: transform 0.2s;
+    transition: all 0.2s;
 }
 
-/* 💡 [v11.0.0] 덜덜거림 없는 우아한 글로우 펄스 애니메이션 (노란-흰색) */
+/* 빛나는 두근두근 애니메이션 (!important 강제 적용) */
 .cat-glow-anim { 
-    animation: cat-glow-heartbeat 1s infinite alternate ease-in-out !important; 
+    animation: cat-hyper-pulse 0.8s infinite alternate ease-in-out !important;
+    border-radius: 50%;
 }
 
-@keyframes cat-glow-heartbeat {
+@keyframes cat-hyper-pulse {
     0% {
         transform: scale(1);
-        filter: drop-shadow(0 0 2px rgba(255, 204, 0, 0.4));
+        filter: drop-shadow(0 0 2px rgba(255, 204, 0, 0.5));
+        background-color: transparent;
     }
     100% {
-        transform: scale(1.25);
-        filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 10px rgba(255, 215, 0, 0.8));
+        transform: scale(1.3);
+        filter: drop-shadow(0 0 10px rgba(255, 255, 255, 1)) drop-shadow(0 0 15px rgba(255, 215, 0, 0.9));
+        background-color: rgba(255, 215, 0, 0.2);
     }
 }
 
-.cat-mes-trans-btn:hover .cat-emoji-icon { transform: scale(1.2); transition: 0.2s; }
+/* 💡 [v12.1.0] 자체 제작 팝업창 디자인 (절대 씹히지 않음) */
+.cat-notification {
+    position: fixed;
+    top: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
+    border-radius: 30px;
+    color: white;
+    font-family: inherit; /* 팝업도 순정 폰트 */
+    font-weight: bold;
+    font-size: 14px;
+    z-index: 2147483647 !important; /* 물리적으로 가장 높은 최상단 z-index */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
+    white-space: nowrap;
+}
+.cat-notification.show {
+    top: 25px; /* 화면 상단에 예쁘게 등장 */
+}
