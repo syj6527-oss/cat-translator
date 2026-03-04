@@ -1,6 +1,6 @@
-/* 💡 [v15.0.0] 실리태번 순정 폰트 완벽 동기화 (촌스러운 명조체 타파) */
+/* [v15.5.0] 순정 폰트 강제 주입 */
 .cat-native-font {
-    font-family: var(--smart-font, 'Noto Sans', 'Open Sans', 'Segoe UI', sans-serif) !important;
+    font-family: var(--smart-font, 'Noto Sans', 'Segoe UI', sans-serif) !important;
 }
 
 .cat-setting-row { margin-bottom: 8px; }
@@ -12,37 +12,25 @@
 
 #cat-save-btn { background-color: rgba(168, 199, 250, 0.15); border: 1px solid #a8c7fa; color: #a8c7fa; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
 
-/* 💡 [v15.0.0] 고양이 덜덜거림(파킨슨병) 완치를 위한 GPU 하드웨어 가속 강제! */
+/* 💡 GPU 가속 적용으로 덜덜거림 방지 */
 .cat-emoji-icon { 
     display: inline-block; 
     line-height: 1;
     transition: all 0.2s;
-    will-change: transform, filter; /* 브라우저에 미리 계산 명령 */
-    -webkit-backface-visibility: hidden; /* 모바일 서브픽셀 찌그러짐 방지 */
-    backface-visibility: hidden;
-    transform: translateZ(0); /* 그래픽 카드(GPU) 강제 할당 */
+    will-change: transform, filter;
+    transform: translateZ(0);
 }
 
-/* 안정된 맥박 애니메이션 */
 .cat-glow-anim { 
     animation: cat-calm-pulse 1.2s infinite alternate ease-in-out !important;
     border-radius: 50%;
 }
 
 @keyframes cat-calm-pulse {
-    0% {
-        transform: scale(1) translateZ(0);
-        filter: drop-shadow(0 0 2px rgba(255, 204, 0, 0.5));
-        background-color: transparent;
-    }
-    100% {
-        transform: scale(1.2) translateZ(0);
-        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 1)) drop-shadow(0 0 12px rgba(255, 215, 0, 0.9));
-        background-color: rgba(255, 215, 0, 0.2);
-    }
+    0% { transform: scale(1) translateZ(0); filter: drop-shadow(0 0 2px rgba(255, 204, 0, 0.5)); }
+    100% { transform: scale(1.2) translateZ(0); filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.9)); background-color: rgba(255, 215, 0, 0.2); }
 }
 
-/* 절대 찢어지지 않는 둥근 알약 팝업 CSS */
 .cat-notification {
     position: fixed;
     top: -60px;
@@ -51,19 +39,16 @@
     padding: 12px 24px;
     border-radius: 30px; 
     color: white;
+    font-family: inherit;
     font-weight: bold;
     font-size: 14px;
     z-index: 2147483647 !important;
     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     pointer-events: none;
-    
     white-space: nowrap;
     max-width: 85vw; 
     overflow: hidden;
-    text-overflow: ellipsis; 
-    text-align: center;
+    text-overflow: ellipsis;
 }
-.cat-notification.show {
-    top: 25px;
-}
+.cat-notification.show { top: 25px; }
