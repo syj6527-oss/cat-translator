@@ -27,7 +27,7 @@ if (!settings.prompt || settings.prompt.trim() === "") {
     settings.prompt = defaultPrompt;
 }
 
-// 설정 저장 (DOM 동기화 포함)
+// 💡 [v6.4.0] 모든 설정값 안전 저장
 function saveSettings() {
     const currentPrompt = $('#ct-prompt').val();
     if (currentPrompt !== undefined) settings.prompt = currentPrompt;
@@ -36,7 +36,7 @@ function saveSettings() {
     translationCache = {}; 
 }
 
-// 결과물 클리닝 (중첩 방지)
+// 💡 [v6.4.0] 중첩 방지 클리닝 (v6.1.0 Fix 유지)
 function cleanResult(text) {
     if (!text) return "";
     return text
@@ -47,7 +47,7 @@ function cleanResult(text) {
 }
 
 /**
- * 번역 핵심 로직
+ * 핵심 번역 로직
  */
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     if (!text || text.trim() === "") return text;
@@ -152,27 +152,37 @@ function revertMessage(id) {
     if (changed) stContext.updateMessageBlock(msgId, msg);
 }
 
-// 💡 [v6.3.0] 입력창 버튼 강제 주입 함수 (중복 체크 강화)
+/**
+ * 💡 [v6.4.0] 인스턴트 입력창 버튼 주입 로직
+ */
 function injectInputButtons() {
-    // 이미 버튼이 존재하면 중단
-    if ($('#cat-input-btn').length > 0) return;
-
-    // 현재 활성화된 버튼 찾기 (Send 또는 Stop)
+    // 1. 현재 화면에 떠있는 버튼 중 가장 적절한 타겟 찾기 (Send, Stop 순서)
     const sendBut = $('#send_but');
     const interruptBut = $('#interrupt_but');
     const target = (sendBut.is(':visible') ? sendBut : (interruptBut.is(':visible') ? interruptBut : null));
     
     if (!target || !target.length) return;
 
+    // 2. 이미 해당 버튼 옆에 우리 고양이가 있는지 확인 (부재 시에만 실행)
+    if (target.prev('#cat-input-btn').length > 0) return;
+
+    // 3. 기존에 낙오된 고양이가 있다면 청소 (깔끔한 UI 유지)
+    $('#cat-input-btn, #cat-input-revert-btn').remove();
+
+    // 4. 고양이와 복구 버튼 생성
     const catBtn = $('<div id="cat-input-btn" title="고양이 번역" style="cursor:pointer; margin-right:2px; display:inline-flex; align-items:center; font-size:1.3em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
     const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본 복구" style="cursor:pointer; margin-right:4px; color:#ffb4a2; font-size:1.1em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
     
+    // 타겟 버튼 바로 앞에 삽입
     target.before(catBtn).before(revertBtn);
     
-    catBtn.on('click', async () => {
+    // 이벤트 바인딩
+    catBtn.on('click', async (e) => {
+        e.preventDefault();
         const area = $('#send_textarea');
         const icon = catBtn.find('.cat-emoji-icon');
         if (!area.val() || icon.hasClass('cat-spin-anim')) return;
+        
         icon.addClass('cat-spin-anim');
         const start = Date.now();
         try {
@@ -185,7 +195,7 @@ function injectInputButtons() {
             setTimeout(() => icon.removeClass('cat-spin-anim'), diff);
         }
     });
-    revertBtn.on('click', () => { if (textAreaOriginal) $('#send_textarea').val(textAreaOriginal).trigger('input'); });
+    revertBtn.on('click', (e) => { e.preventDefault(); if (textAreaOriginal) $('#send_textarea').val(textAreaOriginal).trigger('input'); });
 }
 
 function setupUI() {
@@ -222,7 +232,7 @@ function setupUI() {
                         <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;"><input type="checkbox" id="ct-filter-code"> Filter Code Block</label>
                     </div>
                     <div class="cat-setting-row" style="margin-top: 15px;"><button id="cat-save-btn" class="menu_button">설정 저장 🐱</button></div>
-                    <div style="font-size: 0.8em; opacity: 0.1; text-align: center; margin-top: 5px;">v6.3.0 Eternal Build</div>
+                    <div style="font-size: 0.8em; opacity: 0.1; text-align: center; margin-top: 5px;">v6.4.0 Instant Sync Build</div>
                 </div>
             </div>
         `;
@@ -242,12 +252,12 @@ function setupUI() {
 jQuery(() => {
     setupUI();
     
-    // 💡 [v6.3.0] 더 공격적인 감시: 하단바 전체를 감시하여 버튼 교체 즉시 대응
+    // 💡 [v6.4.0] 초고속 실시간 감시 (MutationObserver)
     const observer = new MutationObserver(() => { injectInputButtons(); });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // 💡 [v6.3.0] 예비 로직: 0.5초마다 버튼 유무 확인 (최종 보험)
-    setInterval(injectInputButtons, 500);
+    // 💡 [v6.4.0] 0.1초 단위 고속 폴링 (예비 로직 - 인스턴트 싱크의 핵심)
+    setInterval(injectInputButtons, 100);
 
     stContext.eventSource.on(stContext.event_types.CHARACTER_MESSAGE_RENDERED, (d) => { const msgId = typeof d === 'object' ? d.messageId : d; if(['output', 'both'].includes(settings.autoMode)) processMessage(msgId, false); });
     stContext.eventSource.on(stContext.event_types.USER_MESSAGE_RENDERED, (d) => { const msgId = typeof d === 'object' ? d.messageId : d; if(['input', 'both'].includes(settings.autoMode)) processMessage(msgId, true); });
