@@ -1,6 +1,9 @@
 .cat-setting-row { margin-bottom: 8px; }
 .cat-setting-row > label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 2px; }
 
+/* 💡 빈 박스 제거 (사진 1772602160727.jpeg 완벽 해결) */
+#cat-trans-container .inline-drawer-icon { display: none !important; width: 0 !important; padding: 0 !important; margin: 0 !important; }
+
 #cat-trans-container .inline-drawer-header { display: flex !important; align-items: center !important; justify-content: space-between !important; cursor: pointer !important; padding: 0.5em 0.8em !important; min-height: 3em !important; }
 #cat-trans-container .inline-drawer-title { display: flex !important; align-items: center !important; gap: 10px !important; flex: 1 !important; font-size: 1.1em; }
 #cat-trans-container .inline-drawer-toggle { transition: transform 0.2s; opacity: 0.7; }
@@ -12,7 +15,7 @@
 #cat-input-btn, #cat-input-revert-btn { display: inline-flex; vertical-align: middle; }
 .cat-emoji-icon { display: inline-block; transition: transform 0.2s; }
 
-/* 💡 고양이 회전 애니메이션 복구 */
+/* 💡 고양이 회전 부활 */
 .cat-spin-anim { animation: cat-spin 1.2s infinite linear !important; }
 @keyframes cat-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
