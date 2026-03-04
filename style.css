@@ -1,4 +1,9 @@
-.cat-setting-row { margin-bottom: 8px; font-family: inherit; }
+/* 💡 [v15.0.0] 실리태번 순정 폰트 완벽 동기화 (촌스러운 명조체 타파) */
+.cat-native-font {
+    font-family: var(--smart-font, 'Noto Sans', 'Open Sans', 'Segoe UI', sans-serif) !important;
+}
+
+.cat-setting-row { margin-bottom: 8px; }
 .cat-setting-row > label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 2px; }
 
 #cat-drawer-header { display: flex !important; align-items: center !important; justify-content: space-between !important; cursor: pointer !important; padding: 0.5em 0.8em !important; min-height: 3em !important; }
@@ -7,13 +12,18 @@
 
 #cat-save-btn { background-color: rgba(168, 199, 250, 0.15); border: 1px solid #a8c7fa; color: #a8c7fa; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
 
+/* 💡 [v15.0.0] 고양이 덜덜거림(파킨슨병) 완치를 위한 GPU 하드웨어 가속 강제! */
 .cat-emoji-icon { 
     display: inline-block; 
     line-height: 1;
     transition: all 0.2s;
+    will-change: transform, filter; /* 브라우저에 미리 계산 명령 */
+    -webkit-backface-visibility: hidden; /* 모바일 서브픽셀 찌그러짐 방지 */
+    backface-visibility: hidden;
+    transform: translateZ(0); /* 그래픽 카드(GPU) 강제 할당 */
 }
 
-/* 안정된 1.2초 심박수 (쿵쾅거림 완치) */
+/* 안정된 맥박 애니메이션 */
 .cat-glow-anim { 
     animation: cat-calm-pulse 1.2s infinite alternate ease-in-out !important;
     border-radius: 50%;
@@ -21,27 +31,26 @@
 
 @keyframes cat-calm-pulse {
     0% {
-        transform: scale(1);
+        transform: scale(1) translateZ(0);
         filter: drop-shadow(0 0 2px rgba(255, 204, 0, 0.5));
         background-color: transparent;
     }
     100% {
-        transform: scale(1.2);
+        transform: scale(1.2) translateZ(0);
         filter: drop-shadow(0 0 8px rgba(255, 255, 255, 1)) drop-shadow(0 0 12px rgba(255, 215, 0, 0.9));
         background-color: rgba(255, 215, 0, 0.2);
     }
 }
 
-/* 💡 [v14.0.0] 절대 찢어지지 않는 둥근 알약 팝업 CSS */
+/* 절대 찢어지지 않는 둥근 알약 팝업 CSS */
 .cat-notification {
     position: fixed;
     top: -60px;
     left: 50%;
     transform: translateX(-50%);
     padding: 12px 24px;
-    border-radius: 30px; /* 둥근 모양 */
+    border-radius: 30px; 
     color: white;
-    font-family: inherit;
     font-weight: bold;
     font-size: 14px;
     z-index: 2147483647 !important;
@@ -49,11 +58,10 @@
     transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     pointer-events: none;
     
-    /* 화면 밖으로 밀려나지 않도록 방어막 전개 */
     white-space: nowrap;
-    max-width: 85vw; /* 모바일 화면의 85%까지만 커지게 제한 */
+    max-width: 85vw; 
     overflow: hidden;
-    text-overflow: ellipsis; /* 너무 길면 ...으로 처리 */
+    text-overflow: ellipsis; 
     text-align: center;
 }
 .cat-notification.show {
