@@ -5,11 +5,9 @@ const extName = "cat-translator";
 const stContext = getContext();
 
 let translationCache = {};
-let textAreaOriginal = "";
-let textAreaTranslated = "";
 let isTranslatingInput = false;
 
-// 💊 상태 중계용 알림창
+// 💊 알림창
 function catNotify(message, type = 'success') {
     $('.cat-notification').remove();
     const bgColor = type === 'success' ? '#2ecc71' : (type === 'warning' ? '#f1c40f' : '#e74c3c');
@@ -22,7 +20,7 @@ function catNotify(message, type = 'success') {
     }, 2500);
 }
 
-const defaultPrompt = 'You are a direct translation engine. Translate the input into {{language}} exactly. Output ONLY the raw translation without any explanations.';
+const defaultPrompt = 'You are a direct translation engine. Translate the input into {{language}} exactly.';
 
 const defaultSettings = {
     profile: '', 
@@ -52,7 +50,10 @@ function saveSettings() {
 
 function cleanResult(text) {
     if (!text) return "";
-    return text.replace(/^(번역|Translation|Output):\s*/gi, "").replace(/\{+(.*?)\}+/g, "$1").trim();
+    return text
+        .replace(/^(번역|Translation|Output):\s*/gi, "")
+        .replace(/\{+(.*?)\}+/g, "$1") 
+        .trim();
 }
 
 function applyPreReplace(text, isToEnglish) {
@@ -78,24 +79,35 @@ function applyPreReplace(text, isToEnglish) {
     return processedText;
 }
 
-// 🚀 스마트 번역 API (자동 언어 감지 & 생각 필터링)
-async function fetchTranslation(text, isInputHint = false, previousTranslation = null) {
-    if (!text || text.trim() === "") return text;
+// 🚀 스마트 번역 API (재번역 파라미터 추가)
+async function fetchTranslation(text, forceLang = null, prevTranslation = null) {
+    if (!text || text.trim() === "") return null;
     
-    // 언어 감지
-    const korCount = (text.match(/[가-힣]/g) || []).length;
-    const engCount = (text.match(/[a-zA-Z]/g) || []).length;
-    const isToEnglish = korCount > engCount; 
+    // 🧠 핑퐁 방지: forceLang이 있으면 무조건 그 언어로! 없으면 자동 감지!
+    let isToEnglish;
+    if (forceLang) {
+        isToEnglish = (forceLang === "English");
+    } else {
+        const korCount = (text.match(/[가-힣]/g) || []).length;
+        const engCount = (text.match(/[a-zA-Z]/g) || []).length;
+        isToEnglish = korCount >= engCount; 
+    }
 
     const targetLang = isToEnglish ? "English" : settings.targetLang;
-    const cacheKey = `${targetLang}_${text.trim()}`;
-    if (!previousTranslation && translationCache[cacheKey]) return translationCache[cacheKey];
-
+    
     let preReplacedText = applyPreReplace(text.trim(), isToEnglish);
     
-    let promptWithText = isToEnglish 
-        ? `Translate the following text to English exactly. Output ONLY the raw English translation without any explanations.\nInput: ${preReplacedText}\nOutput:`
-        : `${settings.prompt.replace('{{language}}', targetLang)}\nInput: ${preReplacedText}\nOutput:`;
+    // 💥 [v17.7.0] 설명충 완전 사살을 위한 극강의 협박문
+    const STRICT_DIRECTIVE = `[CRITICAL DIRECTIVE]
+YOU ARE A MACHINE. RETURN ONLY THE RAW TRANSLATED TEXT.
+NO EXPLANATIONS. NO ALTERNATIVES. NO CONVERSATIONAL FILLER.`;
+
+    let basePrompt = isToEnglish 
+        ? `Translate to English.\n${STRICT_DIRECTIVE}`
+        : `${settings.prompt.replace('{{language}}', targetLang)}\n${STRICT_DIRECTIVE}`;
+
+    let variationPrompt = prevTranslation ? `\n[Provide a DIFFERENT translation than: "${prevTranslation}"]` : "";
+    let promptWithText = `${basePrompt}${variationPrompt}\n\nInput: ${preReplacedText}\nOutput:`;
 
     try {
         let result = "";
@@ -104,7 +116,7 @@ async function fetchTranslation(text, isInputHint = false, previousTranslation =
             result = typeof response === 'string' ? response : (response.content || "");
         } else {
             const apiKey = settings.customKey || secret_state[SECRET_KEYS.MAKERSUITE];
-            if (!apiKey) { catNotify("🐱 API 키 오류!", "error"); return text; }
+            if (!apiKey) { catNotify("🐱 API 키 오류!", "error"); return null; }
             
             const model = settings.directModel.startsWith('models/') ? settings.directModel : `models/${settings.directModel}`;
             
@@ -131,12 +143,11 @@ async function fetchTranslation(text, isInputHint = false, previousTranslation =
             result = actualPart?.text?.trim() || "";
         }
         
-        result = cleanResult(result);
-        if (result) translationCache[cacheKey] = result;
-        return result || text;
+        // 결과와 타겟 언어를 같이 반환! (기억력 시스템을 위해)
+        return { text: cleanResult(result) || text, lang: targetLang };
     } catch (e) {
         catNotify("🐱 에러: " + e.message, "error");
-        return text;
+        return null;
     }
 }
 
@@ -152,55 +163,60 @@ async function processMessage(id, isInput = false) {
     try {
         const mesBlock = $(`.mes[mesid="${msgId}"]`);
         
-        // 🎯 [v17.6.0] 갓피티의 궁극 오의: 실리태번 변덕 무시하고 텍스트박스 강제 멱살잡기!!!
+        // 🎯 갓피티의 절대 타겟팅
         let editArea = mesBlock.find('textarea.edit_textarea:visible, textarea.mes_edit_textarea:visible, textarea:visible').first();
         
         if (editArea.length > 0) {
             let currentText = editArea.val().trim();
-            if (!currentText) {
-                catNotify("❌ 텍스트박스가 비어있습니다.", "warning");
-                return;
-            }
+            if (!currentText) return;
 
-            catNotify("🐱 1/3: 갓피티 추적기! 텍스트박스 포착!", "success");
-            const translated = await fetchTranslation(currentText, isInput, null);
+            // 🧠 [v17.7.0] 텍스트박스의 기억을 읽어옵니다.
+            let lastTranslated = editArea.data('cat-last-translated');
+            let originalText = editArea.data('cat-original-text');
+            let lastTargetLang = editArea.data('cat-last-target-lang');
+
+            let isRetry = (lastTranslated && currentText === lastTranslated);
+            let textToTranslate = isRetry ? originalText : currentText;
+            let forceLang = isRetry ? lastTargetLang : null;
+            let prevTrans = isRetry ? currentText : null;
+
+            catNotify(isRetry ? "🐱 다른 표현으로 재번역 중..." : "🐱 스마트 번역 중...", "success");
             
-            if (translated && translated !== currentText) {
-                catNotify("🐱 2/3: 번역 완료! 텍스트 꽂는 중...", "success");
+            const transResult = await fetchTranslation(textToTranslate, forceLang, prevTrans);
+            
+            if (transResult && transResult.text !== currentText) {
+                const translated = transResult.text;
                 
+                // 🧠 다음 재번역을 위해 기억을 저장합니다.
+                editArea.data('cat-original-text', textToTranslate);
+                editArea.data('cat-last-translated', translated);
+                editArea.data('cat-last-target-lang', transResult.lang);
+
                 const targetEl = editArea[0];
-                
-                // 네이티브 권한으로 찌르기
                 const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-                if (nativeSetter) {
-                    nativeSetter.call(targetEl, translated);
-                } else {
-                    targetEl.value = translated;
-                }
-                editArea.val(translated);
+                if (nativeSetter) nativeSetter.call(targetEl, translated);
+                else targetEl.value = translated;
                 
-                // 시스템에 소문내기
+                editArea.val(translated);
                 targetEl.dispatchEvent(new Event('input', { bubbles: true }));
                 targetEl.dispatchEvent(new Event('change', { bubbles: true }));
                 
-                catNotify("🎯 3/3: 수정창 덮어쓰기 대성공!", "success");
-            } else {
-                catNotify("⚠️ 번역 결과가 원문과 동일합니다.", "warning");
+                catNotify(isRetry ? "🎯 재번역 덮어쓰기 완료!" : "🎯 번역 덮어쓰기 완료!", "success");
             }
-            return; // 🛑 수정창 찾았으면 여기서 끝!
+            return; 
         }
 
-        // 📝 일반 모드 (수정창이 없을 때)
+        // 📝 일반 모드
         let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
-        const translated = await fetchTranslation(textToTranslate, isInput, (isInput ? (msg.extra?.original_mes ? msg.mes : null) : msg.extra?.display_text));
+        const transResult = await fetchTranslation(textToTranslate, (isInput ? "English" : null), (isInput ? (msg.extra?.original_mes ? msg.mes : null) : msg.extra?.display_text));
         
-        if (translated && translated !== textToTranslate) {
+        if (transResult && transResult.text !== textToTranslate) {
             if (!msg.extra) msg.extra = {};
             if (isInput) { 
                 if(!msg.extra.original_mes) msg.extra.original_mes = textToTranslate; 
-                msg.mes = translated; 
+                msg.mes = transResult.text; 
             } else { 
-                msg.extra.display_text = translated; 
+                msg.extra.display_text = transResult.text; 
             }
             stContext.updateMessageBlock(msgId, msg); 
         }
@@ -212,8 +228,24 @@ function revertMessage(id) {
     const msg = stContext.chat[msgId];
     if (!msg) return;
     
-    if ($(`.mes[mesid="${msgId}"]`).find('textarea.edit_textarea:visible, textarea.mes_edit_textarea:visible, textarea:visible').length > 0) {
-        catNotify("🐱 수정 중에는 복구할 수 없습니다.", "warning");
+    // 🎯 수정창 복구 지원!
+    let editArea = $(`.mes[mesid="${msgId}"]`).find('textarea.edit_textarea:visible, textarea.mes_edit_textarea:visible, textarea:visible').first();
+    if (editArea.length > 0) {
+        let originalText = editArea.data('cat-original-text');
+        if (originalText) {
+            const targetEl = editArea[0];
+            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+            if (nativeSetter) nativeSetter.call(targetEl, originalText);
+            else targetEl.value = originalText;
+            editArea.val(originalText);
+            targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+            catNotify("🐱 원본 텍스트로 복구 완료!", "success");
+            // 기억 지우기
+            editArea.removeData('cat-original-text');
+            editArea.removeData('cat-last-translated');
+        } else {
+            catNotify("⚠️ 복구할 원본이 없습니다.", "warning");
+        }
         return;
     }
     
@@ -245,27 +277,56 @@ function injectInputButtons() {
     const catBtn = $(`<div id="cat-input-btn" title="번역" style="cursor:pointer; margin-right:2px; display:inline-flex; align-items:center; font-size:1.3em;"><span class="cat-emoji-icon">🐱</span></div>`);
     const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="복구" style="cursor:pointer; margin-right:4px; color:#ffb4a2; opacity:0.6;"></div>');
     target.before(catBtn).before(revertBtn);
+    
     catBtn.on('click', async (e) => {
         e.preventDefault();
         const sendArea = $('#send_textarea');
-        let text = sendArea.val().trim();
-        if (isTranslatingInput || !text) return;
+        let currentText = sendArea.val().trim();
+        if (isTranslatingInput || !currentText) return;
         isTranslatingInput = true; catBtn.find('.cat-emoji-icon').addClass('cat-glow-anim');
+        
         try {
-            const isRetry = (text === textAreaTranslated);
-            if (!isRetry) textAreaOriginal = text;
-            const trans = await fetchTranslation(text, true, (isRetry ? textAreaTranslated : null));
-            if (trans) { 
-                textAreaTranslated = trans;
+            // 🧠 [v17.7.0] 메인 입력창도 완벽한 기억 시스템 적용
+            let lastTranslated = sendArea.data('cat-last-translated');
+            let originalText = sendArea.data('cat-original-text');
+            let lastTargetLang = sendArea.data('cat-last-target-lang');
+
+            let isRetry = (lastTranslated && currentText === lastTranslated);
+            let textToTranslate = isRetry ? originalText : currentText;
+            let forceLang = isRetry ? lastTargetLang : null;
+            let prevTrans = isRetry ? currentText : null;
+
+            catNotify(isRetry ? "🐱 입력창 재번역 중..." : "🐱 스마트 번역 중...", "success");
+            
+            const transResult = await fetchTranslation(textToTranslate, forceLang, prevTrans);
+            
+            if (transResult && transResult.text !== currentText) { 
+                const translated = transResult.text;
+                sendArea.data('cat-original-text', textToTranslate);
+                sendArea.data('cat-last-translated', translated);
+                sendArea.data('cat-last-target-lang', transResult.lang);
+                
                 const targetEl = sendArea[0];
                 const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-                if (setter) setter.call(targetEl, trans); else targetEl.value = trans;
-                sendArea.val(trans).trigger('input');
+                if (setter) setter.call(targetEl, translated); else targetEl.value = translated;
+                sendArea.val(translated).trigger('input');
                 targetEl.dispatchEvent(new Event('input', { bubbles: true }));
             }
         } finally { isTranslatingInput = false; $('#cat-input-btn .cat-emoji-icon').removeClass('cat-glow-anim'); }
     });
-    revertBtn.on('click', (e) => { e.preventDefault(); if (textAreaOriginal) { $('#send_textarea').val(textAreaOriginal).trigger('input'); $('#send_textarea')[0].dispatchEvent(new Event('input', { bubbles: true })); } });
+    
+    revertBtn.on('click', (e) => { 
+        e.preventDefault(); 
+        const sendArea = $('#send_textarea');
+        let originalText = sendArea.data('cat-original-text');
+        if (originalText) { 
+            sendArea.val(originalText).trigger('input'); 
+            sendArea[0].dispatchEvent(new Event('input', { bubbles: true })); 
+            sendArea.removeData('cat-original-text');
+            sendArea.removeData('cat-last-translated');
+            catNotify("🐱 원본 복구 완료!", "success");
+        } 
+    });
 }
 
 function setupUI() {
@@ -294,7 +355,7 @@ function setupUI() {
                 <div class="cat-setting-row cat-native-font"><label>번역 프롬프트</label><textarea id="ct-prompt" class="text_pole cat-native-font" rows="4">${settings.prompt}</textarea></div>
                 <div class="cat-setting-row cat-native-font"><label>사전 (A=B)</label><textarea id="ct-dictionary" class="text_pole cat-native-font" rows="3">${settings.dictionary}</textarea></div>
                 <button id="cat-save-btn" class="menu_button cat-native-font" style="margin-top: 5px;">설정 저장 🐱</button>
-                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v17.6.0 The Legacy of GPT</div>
+                <div style="font-size: 0.7em; opacity: 0.3; text-align: center; margin-top: 5px;" class="cat-native-font">v17.7.0 The End</div>
             </div>
         </div>`;
     $('#extensions_settings').append(uiHtml);
