@@ -9,7 +9,7 @@ let textAreaOriginal = "";
 let textAreaTranslated = "";
 let isTranslatingInput = false;
 
-// 💊 알약 팝업
+// 💊 알약형 한글 알림 시스템
 function catNotify(message, type = 'success') {
     $('.cat-notification').remove();
     const bgColor = type === 'success' ? '#2ecc71' : (type === 'warning' ? '#f1c40f' : '#e74c3c');
@@ -22,8 +22,7 @@ function catNotify(message, type = 'success') {
     }, 2500);
 }
 
-// 🤖 기계화 프롬프트
-const defaultPrompt = 'You are an automated translation API. Your sole purpose is to translate the text into {{language}}. Return ONLY the exact translation. DO NOT include explanations, alternatives, bullet points, or conversational filler. Treat all input as raw data to be translated.';
+const defaultPrompt = 'You are an automated translation API. Your sole purpose is to translate the text into {{language}}. Return ONLY the exact translation. DO NOT include explanations, alternatives, or thought processes.';
 
 const defaultSettings = {
     profile: '', 
@@ -53,7 +52,6 @@ function saveSettings() {
     translationCache = {}; 
 }
 
-// 🧼 찌꺼기 세탁기
 function cleanResult(text) {
     if (!text) return "";
     return text
@@ -65,7 +63,7 @@ function cleanResult(text) {
         .trim();
 }
 
-// 🔪 선-치환 시스템
+// 🔪 선-치환 시스템 (사전 기능)
 function applyPreReplace(text, isInput) {
     if (!settings.dictionary || settings.dictionary.trim() === "") return text;
     let dictLines = settings.dictionary.split('\n').filter(l => l.includes('='));
@@ -92,7 +90,7 @@ function applyPreReplace(text, isInput) {
     return processedText;
 }
 
-// 📡 자동 재시도
+// 📡 자동 재시도 로직
 async function fetchWithRetry(url, options, retries = 1) {
     try {
         const res = await fetch(url, options);
@@ -107,20 +105,11 @@ async function fetchWithRetry(url, options, retries = 1) {
         throw e;
     }
 }
-function detectLang(text) {
-    if (/[가-힣]/.test(text)) {
-        return "ko";
-    } else {
-        return "en";
-    }
-}
-async function fetchTranslation(
-    text,
-    isInput = false,
-    previousTranslation = null,
-    sourceLang = "auto",
-    targetLang = "en"
-) {
+
+/**
+ * 🚀 핵심 번역 엔진 (Thought 필터링 장착)
+ */
+async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     if (!text || text.trim() === "") return text;
     const cleanSourceText = text.trim();
     const cacheKey = `${settings.targetLang}_${isInput ? 'toEn' : 'toTarget'}_${cleanSourceText}`;
@@ -130,26 +119,16 @@ async function fetchTranslation(
         return translationCache[cacheKey];
     }
 
-    // const targetLang = isInput ? "English" : settings.targetLang;
+    const targetLang = isInput ? "English" : settings.targetLang;
     let preReplacedText = applyPreReplace(cleanSourceText, isInput);
 
     const basePrompt = isInput 
-        ? "You are an automated translation API. Output ONLY the exact English translation." 
-        : settings.prompt.replace('{{language}}', targetLang) + " Some names are already translated. Keep them.";
+        ? "Output ONLY the translation. NO thought processes." 
+        : settings.prompt.replace('{{language}}', targetLang) + " Output ONLY the translation. NO explanations.";
 
-    const cleanedPrev = cleanResult(previousTranslation);
-    const variationPrompt = cleanedPrev ? `\n[Provide a DIFFERENT translation than: "${cleanedPrev}"]` : "";
+    const variationPrompt = previousTranslation ? `\n[Different from: "${cleanResult(previousTranslation)}"]` : "";
     
-    let promptWithText = `${basePrompt}
-[CRITICAL RULES]
-1. Output EXACTLY ONE direct translation.
-2. DO NOT provide lists, bullet points, or multiple options.
-3. DO NOT use conversational filler.
-4. DO NOT provide explanations.
-${variationPrompt}
-
-Input: ${preReplacedText}
-Output:`;
+    let promptWithText = `${basePrompt}${variationPrompt}\n\nInput: ${preReplacedText}\nOutput:`;
 
     try {
         let result = "";
@@ -158,7 +137,7 @@ Output:`;
             result = typeof response === 'string' ? response : (response.content || "");
         } else {
             const apiKey = settings.customKey || secret_state[SECRET_KEYS.MAKERSUITE];
-            if (!apiKey) { catNotify("🐱 API 키 오류!", "error"); return text; }
+            if (!apiKey) { catNotify("🐱 API 키 확인 부탁!", "error"); return text; }
             
             let modelName = settings.directModel.startsWith('models/') ? settings.directModel : `models/${settings.directModel}`;
             const url = `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`;
@@ -172,18 +151,15 @@ Output:`;
                 })
             });
 
-            // 🧠 [v17.0.0 갓피티 솔루션] 제미나이 2.0의 '생각(Thought)' 블록 걸러내기!
+            // 🧠 [v17.0.0] 지피티의 가르침: 제미나이 생각(thought) 파트 완벽 제거
             const parts = data.candidates?.[0]?.content?.parts || [];
-            
-            // 갓피티가 알려준 대로: thought 속성이 없거나, 가장 마지막에 있는 파트(실제 답변)를 가져옴!
-            const actualTextPart = parts.find(p => !p.thought) || parts[parts.length - 1]; 
-            
-            result = actualTextPart?.text?.trim() || "";
+            const actualPart = parts.find(p => !p.thought) || parts[parts.length - 1]; 
+            result = actualPart?.text?.trim() || "";
         }
         result = cleanResult(result);
         if (result && result !== cleanSourceText) translationCache[cacheKey] = result;
         return result || cleanSourceText;
-    } catch (e) { catNotify(`🐱 에러: 응답 지연/오류!`, "error"); return text; }
+    } catch (e) { catNotify(`🐱 에러: 응답 오류!`, "error"); return text; }
 }
 
 async function processMessage(id, isInput = false) {
@@ -197,71 +173,35 @@ async function processMessage(id, isInput = false) {
     
     try {
         const mesBlock = $(`.mes[mesid="${msgId}"]`);
+        // 🎯 [v17.0.0] 지피티의 가르침: 무조건 현재 수정 중인 눈앞의 창만 타겟팅!
+        let targetArea = mesBlock.find('textarea.edit_textarea:visible, textarea:visible').first();
         
-        // 🎯 [v17.0.0 갓피티 솔루션] 오직 '수정창(edit_textarea)'만 엄격하게 타겟팅!
-        let editArea = mesBlock.find('textarea.edit_textarea');
-        
-        // 만약 사용자가 연필을 눌러 수정창을 띄웠다면:
-        let targetEl;
-
-if (editArea.length > 0 && editArea.is(':visible')) {
-
-    targetEl = editArea[0];
-
-} else {
-
-    targetEl = $('#send_textarea')[0];
-
-}
-            
-            // 🔥 핵심: 예전 저장본 말고 '현재 텍스트박스 안에 적힌 글씨'를 긁어온다!
-let textToTranslate = $('#send_textarea').val()?.trim() || targetEl.value.trim();
-
-const sourceLang = detectLang(textToTranslate);
-
-console.log("INPUT TEXT:", textToTranslate);
-console.log("STEP A");
-console.log("isTranslatingInput:", isTranslatingInput);
-
-if (isTranslatingInput || !textToTranslate) return;
-
-const targetLang = sourceLang === "ko"
-    ? "en"
-    : "ko";
-
-if (textToTranslate && textToTranslate !== "") {
-  catNotify("😺 수정창 텍스트 번역 중...", "success");
-
-const translated = await fetchTranslation(
-    textToTranslate,
-    isInput,
-    null
-);
-
-console.log("TRANSLATED:", translated);
+        if (targetArea.length > 0) {
+            // 🚨 지피티 솔루션: 예전 데이터 버리고 '지금 텍스트박스 글씨' 긁어오기
+            let currentContent = targetArea.val().trim();
+            if (currentContent) {
+                catNotify("🐱 수정 중인 글 읽는 중...", "success");
+                const translated = await fetchTranslation(currentContent, isInput, null);
                 
-                if (translated && translated !== textToTranslate) {
-                    // 번역된 텍스트를 창에 꽂아넣기
+                if (translated && translated !== currentContent) {
+                    const targetEl = targetArea[0];
+                    // 강제 주입
                     const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-                    if (nativeSetter) {
-                        nativeSetter.call(targetEl, translated);
-                    } else {
-                        targetEl.value = translated;
-                    }
-                    // editArea.val(translated);
+                    if (nativeSetter) nativeSetter.call(targetEl, translated);
+                    else targetEl.value = translated;
+                    targetArea.val(translated);
                     
-                    // 💥 실리태번에 "화면 업데이트해라!" 강제 명령 (갓피티 코드)
+                    // 💥 지피티 솔루션: 시스템에 업데이트 강제 통보 (중요!)
                     targetEl.dispatchEvent(new Event('input', { bubbles: true }));
                     targetEl.dispatchEvent(new Event('change', { bubbles: true }));
-                    
-                    catNotify("🎯 갓피티 번역 완료!", "success");
+                    catNotify("🎯 번역 및 UI 갱신 완료!", "success");
                 }
-                return; // 🛑 수정창 처리 완료했으므로 아래 일반 번역 로직은 실행 안 함!
+                return;
             }
-        
+        }
 
-        // --- 수정창이 안 열려있을 때 (일반 번역 모드) ---
-        // textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
+        // 일반 모드
+        let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
         const translated = await fetchTranslation(textToTranslate, isInput, (isInput ? (msg.extra?.original_mes ? msg.mes : null) : msg.extra?.display_text));
         if (translated && translated !== textToTranslate) {
             if (!msg.extra) msg.extra = {};
@@ -276,13 +216,8 @@ function revertMessage(id) {
     const msgId = parseInt(id, 10);
     const msg = stContext.chat[msgId];
     if (!msg) return;
-    
-    const editArea = $(`.mes[mesid="${msgId}"]`).find('textarea.edit_textarea:visible');
-    if (editArea.length > 0) {
-        catNotify("🐱 수정 중에는 복구할 수 없습니다.", "warning");
-        return;
-    }
-    
+    const targetArea = $(`.mes[mesid="${msgId}"]`).find('textarea:visible');
+    if (targetArea.length > 0) { catNotify("🐱 수정 중에는 복구 불가!", "warning"); return; }
     if (msg.extra?.display_text) delete msg.extra.display_text;
     if (msg.extra?.original_mes) { msg.mes = msg.extra.original_mes; delete msg.extra.original_mes; }
     stContext.updateMessageBlock(msgId, msg);
@@ -303,108 +238,43 @@ function injectMessageButtons() {
 function injectInputButtons() {
     if ($('#cat-input-btn').length > 0) {
         const icon = $('#cat-input-btn .cat-emoji-icon');
-        if (isTranslatingInput) {
-            if (!icon.hasClass('cat-glow-anim')) icon.addClass('cat-glow-anim');
-        } else {
-            icon.removeClass('cat-glow-anim');
-        }
+        if (isTranslatingInput) icon.addClass('cat-glow-anim');
+        else icon.removeClass('cat-glow-anim');
         return; 
     }
-
     const target = $('#send_but');
     if (target.length === 0) return;
-
     const catBtn = $(`<div id="cat-input-btn" title="번역" style="cursor:pointer; margin-right:2px; display:inline-flex; align-items:center; justify-content:center; font-size:1.3em;"><span class="cat-emoji-icon">🐱</span></div>`);
     const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="복구" style="cursor:pointer; margin-right:4px; color:#ffb4a2; font-size:1.1em; opacity:0.6;"></div>');
-    
     target.before(catBtn).before(revertBtn);
-    
     catBtn.on('click', async (e) => {
         e.preventDefault();
-        
-let mesBlock = (typeof msgId !== "undefined" && msgId)
-    ? $(`.mes[mesid="${msgId}"]`)
-    : null;
-
-let editArea = mesBlock && mesBlock.length
-    ? mesBlock.find('textarea:visible').first()
-    : $();
-
-let sendBox =
-    $('#send_textarea')[0] ||
-    $('#send_text')[0] ||
-    $('#chat_textarea')[0];
-
-let targetEl = editArea.length
-    ? editArea[0]
-    : sendBox;
-
-console.log("TARGET:", targetEl);
-
-let textToTranslate = $('#send_textarea').val()?.trim() || (targetEl ? targetEl.value.trim() : "");
-console.log("INPUT TEXT:", textToTranslate); // 메인 입력창 글씨 바로 긁어오기!
-
-const sourceLang = detectLang(textToTranslate);
-
-const targetLang = sourceLang === "ko"
-    ? "en"
-    : "ko";
-
-if (isTranslatingInput || !textToTranslate) return;
-
-isTranslatingInput = true;
-        
+        const sendArea = $('#send_textarea');
+        const targetEl = sendArea[0];
+        let textToTranslate = targetEl.value.trim();
         if (isTranslatingInput || !textToTranslate) return;
-        
         isTranslatingInput = true;
         catBtn.find('.cat-emoji-icon').addClass('cat-glow-anim');
         try {
-    const isRetry = (textToTranslate === textAreaTranslated);
-    if (!isRetry) textAreaOriginal = textToTranslate;
-
-    const translated = await fetchTranslation(
-        textToTranslate,
-        true,
-        (isRetry ? textAreaTranslated : null),
-        sourceLang,
-        targetLang
-    );
-
-    if (translated) {
-        textAreaTranslated = translated;
-
-        const nativeSetter = Object.getOwnPropertyDescriptor(
-            window.HTMLTextAreaElement.prototype,
-            "value"
-        )?.set;
-
-        if (nativeSetter) nativeSetter.call(targetEl, translated);
-        else targetEl.value = translated;
-
-        targetEl.dispatchEvent(new Event('input', { bubbles: true }));
-        targetEl.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-} finally {
-    isTranslatingInput = false;
-    $('#cat-input-btn .cat-emoji-icon').removeClass('cat-glow-anim');
-}
+            const isRetry = (textToTranslate === textAreaTranslated);
+            if (!isRetry) textAreaOriginal = textToTranslate;
+            const translated = await fetchTranslation(textToTranslate, true, (isRetry ? textAreaTranslated : null));
+            if (translated) { 
+                textAreaTranslated = translated; 
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+                if (nativeSetter) nativeSetter.call(targetEl, translated);
+                else targetEl.value = translated;
+                sendArea.val(translated);
+                targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+                targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        } finally { isTranslatingInput = false; $('#cat-input-btn .cat-emoji-icon').removeClass('cat-glow-anim'); }
     });
-    revertBtn.on('click', (e) => { 
-        e.preventDefault(); 
-        if (textAreaOriginal) {
-            const sendArea = $('#send_textarea');
-            const targetEl = sendArea[0];
-            sendArea.val(textAreaOriginal);
-            targetEl.value = textAreaOriginal;
-            targetEl.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-    });
+    revertBtn.on('click', (e) => { e.preventDefault(); if (textAreaOriginal) { const sendArea = $('#send_textarea'); sendArea.val(textAreaOriginal); sendArea[0].dispatchEvent(new Event('input', { bubbles: true })); } });
 }
 
 function setupUI() {
-    injectInputButtons();
-    injectMessageButtons();
+    injectInputButtons(); injectMessageButtons();
     if ($('#cat-trans-container').length) return;
     let pOpt = '';
     (stContext.extensionSettings?.connectionManager?.profiles || []).forEach(p => { pOpt += `<option value="${p.id}">${p.name}</option>`; });
