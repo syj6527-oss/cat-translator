@@ -225,11 +225,11 @@ if (textToTranslate && textToTranslate !== "") {
 
 const translated = await fetchTranslation(
     textToTranslate,
-    true,
-    null,
-    sourceLang,
-    targetLang
+    isInput,
+    null
 );
+
+console.log("TRANSLATED:", translated);
                 
                 if (translated && translated !== textToTranslate) {
                     // 번역된 텍스트를 창에 꽂아넣기
