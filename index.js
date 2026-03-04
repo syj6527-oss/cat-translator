@@ -291,10 +291,11 @@ let editArea = mesBlock && mesBlock.length
     ? mesBlock.find('textarea:visible').first()
     : $();
 
-let targetEl = editArea.length
-    ? editArea[0]
-    : $('#send_textarea')[0];
-        
+let sendBox =
+    $('#send_textarea')[0] ||
+    $('#send_text')[0] ||
+    $('#chat_textarea')[0];
+
 let targetEl = editArea.length
     ? editArea[0]
     : sendBox;
