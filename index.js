@@ -4,12 +4,11 @@ import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 const extName = "cat-translator";
 const stContext = getContext();
 
-// 전역 상태 관리
+// 전역 상태
 let translationCache = {};
 let textAreaOriginal = "";
 let textAreaTranslated = "";
 
-// [v6.1.0] 궁극의 프롬프트 - 태그 보호 및 번역 강제
 const defaultPrompt = 'You are a professional translator. Your absolute mission is to translate EVERY piece of natural language text into {{language}}, regardless of its location.\n\n[MANDATORY]\n1. Translate text inside code blocks (```), HTML comments (<!-- text -->), and all tags (<summary>, <details>, <memo>, <font>).\n2. KEEP all structural symbols, brackets, and code syntax EXACTLY as they are. Only swap English words for {{language}}.\n3. DO NOT translate HTML attributes or CSS property names.\n4. Output ONLY the translated result without any commentary.';
 
 const defaultSettings = {
@@ -28,20 +27,16 @@ if (!settings.prompt || settings.prompt.trim() === "") {
     settings.prompt = defaultPrompt;
 }
 
-// 💡 [v6.1.0] 철통 보안 저장 로직: 유실 방지를 위해 DOM에서 직접 추출
+// 저장 로직 (유실 방지)
 function saveSettings() {
     const currentPrompt = $('#ct-prompt').val();
     if (currentPrompt !== undefined) settings.prompt = currentPrompt;
-    
     extension_settings[extName] = settings;
     stContext.saveSettingsDebounced();
     translationCache = {}; 
 }
 
-/**
- * 💡 [v6.1.0] 중첩 방지 클리닝 로직 (사진 15055.jpg 완벽 해결)
- * AI가 응답에 가이드라인 태그를 포함시키는 경우 이를 깨끗이 지웁니다.
- */
+// 중첩 태그 청소 로직 (v6.1.0 fix 유지)
 function cleanResult(text) {
     if (!text) return "";
     return text
@@ -51,15 +46,10 @@ function cleanResult(text) {
         .trim();
 }
 
-/**
- * 핵심 번역 함수
- */
 async function fetchTranslation(text, isInput = false, previousTranslation = null) {
     if (!text || text.trim() === "") return text;
 
     const cacheKey = `${settings.targetLang}_${isInput ? 'toEn' : 'toTarget'}_${text}`;
-    
-    // 리트라이(previousTranslation 존재)가 아닐 때만 캐시 사용
     if (!previousTranslation && translationCache[cacheKey]) {
         toastr.info("🐱 캐시 사용: 토큰을 아꼈습니다!");
         return translationCache[cacheKey];
@@ -67,10 +57,9 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
 
     const targetLang = isInput ? "English" : settings.targetLang;
     const basePrompt = isInput 
-        ? "Translate the following text into natural English. Preserve all format and tags." 
+        ? "Translate the following text into natural English. Preserve formatting." 
         : settings.prompt.replace('{{language}}', targetLang);
 
-    // 중첩 방지를 위해 이전 답변 클리닝 후 지시문 구성
     const cleanedPrev = cleanResult(previousTranslation);
     const variationPrompt = cleanedPrev ? `\n\n[Note: Please provide a DIFFERENT phrasing than: "${cleanedPrev}"]` : "";
     const promptWithText = `${basePrompt}${variationPrompt}\n\n${text}`;
@@ -85,7 +74,6 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
         else {
             const apiKey = settings.customKey || secret_state[SECRET_KEYS.MAKERSUITE];
             if (!apiKey) { toastr.error("🐱 API 키가 없습니다!"); return text; }
-            
             let modelName = settings.directModel;
             if (!modelName.startsWith('models/')) modelName = `models/${modelName}`;
             
@@ -109,9 +97,7 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
             result = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
         }
 
-        // 💡 결과물에서 쓰레기 태그 청소 (v6.1.0 핵심)
         result = cleanResult(result);
-
         if (settings.filterCodeBlock && result) {
             let trimmed = result.trim();
             if (trimmed.startsWith("```") && trimmed.endsWith("```") && !text.trim().startsWith("```")) {
@@ -119,7 +105,6 @@ async function fetchTranslation(text, isInput = false, previousTranslation = nul
                 if (lines.length > 2) result = lines.slice(1, -1).join('\n').trim();
             }
         }
-
         if (result && result !== text) translationCache[cacheKey] = result;
         return result || text;
     } catch (e) {
@@ -132,17 +117,13 @@ async function processMessage(id, isInput = false) {
     const msgId = parseInt(id, 10); 
     const msg = stContext.chat[msgId];
     if (!msg) return;
-
     const btnIcon = $(`.mes[mesid="${msgId}"]`).find('.cat-emoji-icon');
     btnIcon.addClass('cat-spin-anim');
     const startTime = Date.now();
-
     try {
         let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
         let currentTranslatedText = isInput ? (msg.extra?.original_mes ? msg.mes : null) : msg.extra?.display_text;
-
         const translated = await fetchTranslation(textToTranslate, isInput, currentTranslatedText);
-        
         if (translated && translated !== textToTranslate) {
             if (!msg.extra) msg.extra = {};
             if (isInput) { msg.extra.original_mes = textToTranslate; msg.mes = translated; }
@@ -150,7 +131,6 @@ async function processMessage(id, isInput = false) {
             stContext.updateMessageBlock(msgId, msg); 
         }
     } finally {
-        // 💡 고양이 무한 회전 절대 방어
         const diff = Math.max(0, 500 - (Date.now() - startTime));
         setTimeout(() => btnIcon.removeClass('cat-spin-anim'), diff);
     }
@@ -166,30 +146,39 @@ function revertMessage(id) {
     if (changed) stContext.updateMessageBlock(msgId, msg);
 }
 
+// 💡 [v6.2.0] 입력창 UI 상시 유지 로직
+function injectInputButtons() {
+    if ($('#cat-input-btn').length) return; // 이미 있으면 패스
+
+    const sendBut = $('#send_but');
+    if (!sendBut.length) return;
+
+    const catBtn = $('<div id="cat-input-btn" title="고양이 번역" style="cursor:pointer; margin-right:2px; display:inline-flex; align-items:center; font-size:1.3em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
+    const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본 복구" style="cursor:pointer; margin-right:4px; color:#ffb4a2; font-size:1.1em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
+    
+    sendBut.before(catBtn).before(revertBtn);
+    
+    catBtn.on('click', async () => {
+        const area = $('#send_textarea');
+        const icon = catBtn.find('.cat-emoji-icon');
+        if (!area.val() || icon.hasClass('cat-spin-anim')) return;
+        icon.addClass('cat-spin-anim');
+        const start = Date.now();
+        try {
+            const isRetry = (area.val() === textAreaTranslated);
+            if (!isRetry) textAreaOriginal = area.val();
+            const trans = await fetchTranslation(textAreaOriginal, true, (isRetry ? textAreaTranslated : null));
+            if (trans) { textAreaTranslated = trans; area.val(trans).trigger('input'); }
+        } finally {
+            const diff = Math.max(0, 500 - (Date.now() - start));
+            setTimeout(() => icon.removeClass('cat-spin-anim'), diff);
+        }
+    });
+    revertBtn.on('click', () => { if (textAreaOriginal) $('#send_textarea').val(textAreaOriginal).trigger('input'); });
+}
+
 function setupUI() {
-    if (!$('#cat-input-btn').length) {
-        const catBtn = $('<div id="cat-input-btn" title="고양이 번역" style="cursor:pointer; margin-right:2px; display:inline-flex; align-items:center; font-size:1.3em;"><span class="cat-emoji-icon" style="display:inline-block; line-height:1;">🐱</span></div>');
-        const revertBtn = $('<div id="cat-input-revert-btn" class="fa-solid fa-rotate-left" title="원본 복구" style="cursor:pointer; margin-right:4px; color:#ffb4a2; font-size:1.1em; opacity:0.6; transition:all 0.2s; display:inline-flex; align-items:center;"></div>');
-        $('#send_but').before(catBtn).before(revertBtn);
-        
-        catBtn.on('click', async () => {
-            const area = $('#send_textarea');
-            const icon = catBtn.find('.cat-emoji-icon');
-            if (!area.val() || icon.hasClass('cat-spin-anim')) return;
-            icon.addClass('cat-spin-anim');
-            const start = Date.now();
-            try {
-                const isRetry = (area.val() === textAreaTranslated);
-                if (!isRetry) textAreaOriginal = area.val();
-                const trans = await fetchTranslation(textAreaOriginal, true, (isRetry ? textAreaTranslated : null));
-                if (trans) { textAreaTranslated = trans; area.val(trans).trigger('input'); }
-            } finally {
-                const diff = Math.max(0, 500 - (Date.now() - start));
-                setTimeout(() => icon.removeClass('cat-spin-anim'), diff);
-            }
-        });
-        revertBtn.on('click', () => { if (textAreaOriginal) $('#send_textarea').val(textAreaOriginal).trigger('input'); });
-    }
+    injectInputButtons();
 
     if (!$('#cat-trans-container').length) {
         let profileOptions = '';
@@ -222,14 +211,14 @@ function setupUI() {
                         <label style="display:flex; align-items:center; gap:5px; margin-top:8px; cursor:pointer; font-weight:normal; font-size:0.9em; opacity:0.8;"><input type="checkbox" id="ct-filter-code"> Filter Code Block</label>
                     </div>
                     <div class="cat-setting-row" style="margin-top: 15px;"><button id="cat-save-btn" class="menu_button">설정 저장 🐱</button></div>
-                    <div style="font-size: 0.8em; opacity: 0.2; text-align: center; margin-top: 5px;">v6.1.0 Final Stable Build</div>
+                    <div style="font-size: 0.8em; opacity: 0.2; text-align: center; margin-top: 5px;">v6.2.0 Ultra Stable Build</div>
                 </div>
             </div>
         `;
         $('#extensions_settings').append(uiHtml);
-        $('#cat-trans-container .inline-drawer-header').off('click').on('click', function(e) { e.stopPropagation(); const $content = $(this).next('.inline-drawer-content'); const $toggle = $(this).find('.inline-drawer-toggle'); $content.stop().slideToggle(200); $toggle.toggleClass('fa-rotate-180'); });
-        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 모든 설정이 영구 저장되었습니다!"); });
-        $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); if(settings.profile === '') $('#direct-mode-settings').slideDown(); else $('#direct-mode-settings').slideUp(); saveSettings(); });
+        $('#cat-trans-container .inline-drawer-header').on('click', function(e) { e.stopPropagation(); $(this).next('.inline-drawer-content').slideToggle(200); $(this).find('.inline-drawer-toggle').toggleClass('fa-rotate-180'); });
+        $('#cat-save-btn').on('click', function() { saveSettings(); toastr.success("🐱 설정이 저장되었습니다!"); });
+        $('#ct-profile').val(settings.profile).on('change', function() { settings.profile = $(this).val(); $('#direct-mode-settings').toggle(settings.profile === ''); saveSettings(); });
         $('#ct-key').val(settings.customKey).on('input', function() { settings.customKey = $(this).val(); saveSettings(); });
         $('#ct-model').val(settings.directModel).on('change', function() { settings.directModel = $(this).val(); saveSettings(); });
         $('#ct-auto-mode').val(settings.autoMode).on('change', function() { settings.autoMode = $(this).val(); saveSettings(); });
@@ -241,8 +230,14 @@ function setupUI() {
 
 jQuery(() => {
     setupUI();
+    
+    // 💡 [v6.2.0] 실시간 UI 감시: 답변 출력 중에도 버튼을 계속 다시 그림
+    const observer = new MutationObserver(() => { injectInputButtons(); });
+    observer.observe(document.querySelector('#send_container') || document.body, { childList: true, subtree: true });
+
     stContext.eventSource.on(stContext.event_types.CHARACTER_MESSAGE_RENDERED, (d) => { const msgId = typeof d === 'object' ? d.messageId : d; if(['output', 'both'].includes(settings.autoMode)) processMessage(msgId, false); });
     stContext.eventSource.on(stContext.event_types.USER_MESSAGE_RENDERED, (d) => { const msgId = typeof d === 'object' ? d.messageId : d; if(['input', 'both'].includes(settings.autoMode)) processMessage(msgId, true); });
+    
     $(document).on('mouseenter touchstart', '.mes', function() {
         if (!$(this).find('.cat-btn-group').length) {
             const btnGroup = $('<div class="cat-btn-group" style="display:inline-flex; gap:12px; margin-left:10px; align-items:center;"></div>');
