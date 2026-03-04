@@ -209,7 +209,7 @@ async function processMessage(id, isInput = false) {
                     } else {
                         targetEl.value = translated;
                     }
-                    editArea.val(translated);
+                    // editArea.val(translated);
                     
                     // 💥 실리태번에 "화면 업데이트해라!" 강제 명령 (갓피티 코드)
                     targetEl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -283,7 +283,7 @@ function injectInputButtons() {
     catBtn.on('click', async (e) => {
         e.preventDefault();
         
-let editArea = $('.edit_textarea:visible').first();
+let editArea = $('textarea:visible').not('#send_textarea').first();
 let targetEl;
 
 if (editArea.length) {
@@ -291,7 +291,7 @@ if (editArea.length) {
 } else {
     targetEl = $('#send_textarea')[0];
 }
-
+console.log("TARGET:", targetEl);
 let textToTranslate = targetEl.value.trim(); // 메인 입력창 글씨 바로 긁어오기!
         
         if (isTranslatingInput || !textToTranslate) return;
