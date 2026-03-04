@@ -219,14 +219,13 @@ const targetLang = sourceLang === "ko"
 if (textToTranslate && textToTranslate !== "") {
   catNotify("😺 수정창 텍스트 번역 중...", "success");
 
-  const translated = await fetchTranslation(
-    textToTranslate,
-    isInput,
-    null,
-    sourceLang,
-    targetLang
-  );
-}
+const translated = await fetchTranslation(
+  textToTranslate,
+  false,
+  null,
+  sourceLang,
+  targetLang
+);
                 
                 if (translated && translated !== textToTranslate) {
                     // 번역된 텍스트를 창에 꽂아넣기
@@ -346,29 +345,36 @@ isTranslatingInput = true;
         isTranslatingInput = true;
         catBtn.find('.cat-emoji-icon').addClass('cat-glow-anim');
         try {
-            const isRetry = (textToTranslate === textAreaTranslated);
-            if (!isRetry) textAreaOriginal = textToTranslate;
-            
-            const translated = await fetchTranslation(
-    textToTranslate,
-    true,
-    (isRetry ? textAreaTranslated : null),
-    sourceLang,
-    targetLang
-);
-            if (translated) { 
-                textAreaTranslated = translated; 
-                
-                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-                if (nativeSetter) nativeSetter.call(targetEl, translated);
-                else targetEl.value = translated;
-                
-                //sendArea.val(translated);
-                
-                targetEl.dispatchEvent(new Event('input', { bubbles: true }));
-                targetEl.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        } finally { isTranslatingInput = false; $('#cat-input-btn .cat-emoji-icon').removeClass('cat-glow-anim'); }
+    const isRetry = (textToTranslate === textAreaTranslated);
+    if (!isRetry) textAreaOriginal = textToTranslate;
+
+    const translated = await fetchTranslation(
+        textToTranslate,
+        true,
+        (isRetry ? textAreaTranslated : null),
+        sourceLang,
+        targetLang
+    );
+
+    if (translated) {
+        textAreaTranslated = translated;
+
+        const nativeSetter = Object.getOwnPropertyDescriptor(
+            window.HTMLTextAreaElement.prototype,
+            "value"
+        )?.set;
+
+        if (nativeSetter) nativeSetter.call(targetEl, translated);
+        else targetEl.value = translated;
+
+        targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+        targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+} finally {
+    isTranslatingInput = false;
+    $('#cat-input-btn .cat-emoji-icon').removeClass('cat-glow-anim');
+}
     });
     revertBtn.on('click', (e) => { 
         e.preventDefault(); 
