@@ -1,12 +1,14 @@
 .cat-setting-row { margin-bottom: 8px; }
 .cat-setting-row > label { display: block; font-size: 0.85em; font-weight: bold; margin-bottom: 2px; }
 
+/* 💡 UI 찌꺼기 빈 박스 완벽 제거 */
 #cat-trans-container .inline-drawer-icon { display: none !important; width: 0 !important; padding: 0 !important; margin: 0 !important; }
+
 #cat-drawer-header { display: flex !important; align-items: center !important; justify-content: space-between !important; cursor: pointer !important; padding: 0.5em 0.8em !important; min-height: 3em !important; }
 #cat-drawer-header .inline-drawer-title { display: flex !important; align-items: center !important; gap: 10px !important; flex: 1 !important; font-size: 1.1em; }
-#cat-drawer-toggle { transition: transform 0.2s ease-in-out; opacity: 0.7; }
 
-/* 💡 설정창 화살표 충돌 완벽 방지 (새로운 클래스명 사용) */
+/* 💡 화살표 정상 작동 */
+#cat-drawer-toggle { transition: transform 0.2s ease-in-out; opacity: 0.7; }
 .cat-rotate-180 { transform: rotate(180deg) !important; }
 
 #cat-save-btn { background-color: rgba(168, 199, 250, 0.15); border: 1px solid #a8c7fa; color: #a8c7fa; padding: 10px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; transition: all 0.2s; }
@@ -14,23 +16,13 @@
 
 #cat-input-btn, #cat-input-revert-btn { display: inline-flex; vertical-align: middle; }
 
-/* 💡 고양이 목관절 완치: 래퍼(Wrapper)로 중심 강제 고정 */
-.cat-emoji-wrapper {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.4em;
-    height: 1.4em;
-    vertical-align: middle;
+/* 💡 수학적으로 완벽한 고양이 회전축 세팅 */
+.cat-svg-wrapper { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; transform-origin: center center; }
+
+.cat-spin-anim { animation: cat-spin-orbital 1.8s infinite linear !important; }
+@keyframes cat-spin-orbital {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
-.cat-emoji-icon { 
-    display: inline-block; 
-    transition: transform 0.2s; 
-}
-
-/* 회전을 래퍼(Wrapper)에 걸어주어 덜덜거림 원천 차단 */
-.cat-spin-anim { animation: cat-spin 2.0s infinite linear !important; }
-@keyframes cat-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-.cat-mes-trans-btn:hover .cat-emoji-wrapper { transform: scale(1.2); }
+.cat-mes-trans-btn:hover .cat-svg-wrapper { transform: scale(1.15); transition: 0.2s; }
