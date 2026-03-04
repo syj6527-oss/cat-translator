@@ -206,28 +206,29 @@ async function processMessage(id, isInput = false) {
             const targetEl = editArea[0];
             
             // 🔥 핵심: 예전 저장본 말고 '현재 텍스트박스 안에 적힌 글씨'를 긁어온다!
-           let textToTranslate = targetEl.value.trim();
+let textToTranslate = targetEl.value.trim();
 
 const sourceLang = detectLang(textToTranslate);
 
 console.log("INPUT TEXT:", textToTranslate);
+console.log("STEP A");
 console.log("isTranslatingInput:", isTranslatingInput);
 
 if (isTranslatingInput || !textToTranslate) return;
 
 const targetLang = sourceLang === "ko"
-  ? "en"
-  : "ko";
+    ? "en"
+    : "ko";
 
 if (textToTranslate && textToTranslate !== "") {
   catNotify("😺 수정창 텍스트 번역 중...", "success");
 
 const translated = await fetchTranslation(
-  textToTranslate,
-  false,
-  null,
-  sourceLang,
-  targetLang
+    textToTranslate,
+    true,
+    null,
+    sourceLang,
+    targetLang
 );
                 
                 if (translated && translated !== textToTranslate) {
