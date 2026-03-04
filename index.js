@@ -283,9 +283,16 @@ function injectInputButtons() {
     catBtn.on('click', async (e) => {
         e.preventDefault();
         
-        const sendArea = $('#send_textarea');
-        const targetEl = sendArea[0];
-        let textToTranslate = targetEl.value.trim(); // 메인 입력창 글씨 바로 긁어오기!
+let editArea = $('.edit_textarea:visible').first();
+let targetEl;
+
+if (editArea.length) {
+    targetEl = editArea[0];
+} else {
+    targetEl = $('#send_textarea')[0];
+}
+
+let textToTranslate = targetEl.value.trim(); // 메인 입력창 글씨 바로 긁어오기!
         
         if (isTranslatingInput || !textToTranslate) return;
         
@@ -303,7 +310,7 @@ function injectInputButtons() {
                 if (nativeSetter) nativeSetter.call(targetEl, translated);
                 else targetEl.value = translated;
                 
-                sendArea.val(translated);
+                //sendArea.val(translated);
                 
                 targetEl.dispatchEvent(new Event('input', { bubbles: true }));
                 targetEl.dispatchEvent(new Event('change', { bubbles: true }));
