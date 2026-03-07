@@ -93,14 +93,18 @@ export function detectLanguageDirection(text, settings) {
     return { isToEnglish: false, targetLang: settings.targetLang };
 }
 
-// ─── 사전 치환 (Pre-swap) ──────────────────────────────
+// ─── 사전 치환 (Pre-swap) + 매칭 카운트 ─────────────────
 export function applyPreReplace(text, dictionary, isToEnglish) {
-    if (!dictionary || dictionary.trim() === "") return text;
+    return applyPreReplaceWithCount(text, dictionary, isToEnglish).swapped;
+}
+
+export function applyPreReplaceWithCount(text, dictionary, isToEnglish) {
+    if (!dictionary || dictionary.trim() === "") return { swapped: text, matchCount: 0 };
     const lines = dictionary.split('\n').filter(l => l.includes('='));
-    if (lines.length === 0) return text;
+    if (lines.length === 0) return { swapped: text, matchCount: 0 };
 
     let result = text;
-    // 긴 단어 우선 치환 (정확도 향상)
+    let matchCount = 0;
     lines.sort((a, b) => b.split('=')[0].length - a.split('=')[0].length);
 
     lines.forEach(line => {
@@ -112,11 +116,16 @@ export function applyPreReplace(text, dictionary, isToEnglish) {
             const replaceStr = isToEnglish ? orig : trans;
             if (searchStr && replaceStr) {
                 const escaped = searchStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                result = result.replace(new RegExp(escaped, 'gi'), replaceStr);
+                const regex = new RegExp(escaped, 'gi');
+                const matches = result.match(regex);
+                if (matches) {
+                    matchCount += matches.length;
+                    result = result.replace(regex, replaceStr);
+                }
             }
         }
     });
-    return result;
+    return { swapped: result, matchCount };
 }
 
 // ─── 텍스트 정규화 (캐시 키 생성용) ───────────────────

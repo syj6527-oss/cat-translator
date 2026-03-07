@@ -52,9 +52,13 @@ async function processMessage(id, isInput = false, abortSignal = null) {
     const msg = stContext.chat[msgId];
     if (!msg) return;
 
-    const btnIcon = $(`.mes[mesid="${msgId}"]`).find('.cat-mes-trans-btn .cat-emoji-icon');
-    if (btnIcon.hasClass('cat-glow-anim')) return;
-    btnIcon.addClass('cat-glow-anim');
+    // 발광 시작 (현재 DOM에서 찾기)
+    const startGlow = () => $(`.mes[mesid="${msgId}"]`).find('.cat-mes-trans-btn .cat-emoji-icon').addClass('cat-glow-anim');
+    const stopGlow = () => $(`.mes[mesid="${msgId}"]`).find('.cat-mes-trans-btn .cat-emoji-icon').removeClass('cat-glow-anim');
+
+    // 이미 번역 중이면 무시 (현재 DOM 기준)
+    if ($(`.mes[mesid="${msgId}"]`).find('.cat-mes-trans-btn .cat-emoji-icon.cat-glow-anim').length > 0) return;
+    startGlow();
 
     try {
         const mesBlock = $(`.mes[mesid="${msgId}"]`);
@@ -94,7 +98,7 @@ async function processMessage(id, isInput = false, abortSignal = null) {
         await doTranslateMessage(msgId, msg, textToTranslate, isInput, existingTranslation, abortSignal);
 
     } finally {
-        btnIcon.removeClass('cat-glow-anim');
+        stopGlow();
     }
 }
 

@@ -6,7 +6,7 @@
 import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 import {
     cleanResult, catNotify,
-    detectLanguageDirection, applyPreReplace, getThemeEmoji
+    detectLanguageDirection, applyPreReplaceWithCount, getThemeEmoji
 } from './utils.js';
 import { getCached, setCached } from './cache.js';
 
@@ -75,12 +75,16 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
     if (!prevTranslation) {
         const cached = await getCached(text, targetLang);
         if (cached) {
+            catNotify(`${getThemeEmoji()} 캐시 히트! ~${Math.round(text.length * 0.5)} 토큰 절약`, "success");
             return { text: cached.translated, lang: targetLang, fromCache: true };
         }
     }
 
     // 3️⃣ 사전 치환 (Pre-swap)
-    const preSwapped = applyPreReplace(text.trim(), settings.dictionary, isToEnglish);
+    const { swapped: preSwapped, matchCount } = applyPreReplaceWithCount(text.trim(), settings.dictionary, isToEnglish);
+    if (matchCount > 0) {
+        catNotify(`🐾 사전 ${matchCount}개 단어 매칭됨!`, "success");
+    }
 
     // 4️⃣ 프롬프트 조립
     const prompt = assemblePrompt(preSwapped, targetLang, isToEnglish, settings, {
@@ -139,14 +143,9 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
         // 5️⃣ 결과 세탁
         let cleaned = cleanResult(result);
 
-        // 🛡️ 빈 결과/엉뚱한 결과 방어
-        if (!cleaned || cleaned.length < 2) {
+        // 🛡️ 빈 결과 방어 (완전히 비어있을 때만)
+        if (!cleaned || cleaned.trim().length === 0) {
             catNotify(`${getThemeEmoji()} 번역 결과가 비어있습니다. 원문 유지.`, "warning");
-            return null;
-        }
-        // 결과가 원문 대비 90% 이상 짧으면 의심
-        if (cleaned.length < text.length * 0.1 && text.length > 50) {
-            catNotify(`${getThemeEmoji()} 번역 결과가 너무 짧습니다. 원문 유지.`, "warning");
             return null;
         }
 
@@ -168,6 +167,12 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
 // ─── 프롬프트 조립기 ────────────────────────────────
 function assemblePrompt(text, targetLang, isToEnglish, settings, options = {}) {
     const { prevTranslation, contextMessages = [] } = options;
+
+    // 🎯 짧은 텍스트 (50자 미만) → 경량 프롬프트
+    if (text.length < 50 && !prevTranslation && contextMessages.length === 0) {
+        const lang = isToEnglish ? 'English' : targetLang;
+        return `Translate to ${lang}. Output ONLY the translation, nothing else.\n\n${text}`;
+    }
 
     // 시스템 보호막
     let parts = [SYSTEM_SHIELD];
