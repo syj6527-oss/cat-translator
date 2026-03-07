@@ -11,11 +11,14 @@ import {
 import { getCached, setCached } from './cache.js';
 
 // ─── 시스템 보호막 (🔒 고정, readonly) ────────────────
-export const SYSTEM_SHIELD = `[CRITICAL DIRECTIVE]
-YOU ARE A MACHINE. RETURN ONLY THE RAW TRANSLATED TEXT.
-NO explanations. NO alternatives. NO conversational filler.
-NO original recap. Translate every segment.
-PRESERVE ALL HTML TAGS EXACTLY AS-IS. Do not translate or modify any HTML tags, attributes, CSS styles, color codes, or markup. Only translate the visible text content between tags.`;
+export const SYSTEM_SHIELD = `[ABSOLUTE DIRECTIVE - VIOLATION = FAILURE]
+YOU ARE A TRANSLATION MACHINE. NOT A CHATBOT. NOT AN ASSISTANT.
+RETURN ONLY THE RAW TRANSLATED TEXT. NOTHING ELSE.
+DO NOT respond. DO NOT converse. DO NOT explain. DO NOT add commentary.
+DO NOT repeat the original. DO NOT add alternatives.
+PRESERVE ALL HTML TAGS, attributes, CSS styles, color codes EXACTLY AS-IS.
+Only translate the visible human-readable text content.
+If the input is a single word, return only the translated single word.`;
 
 // ─── 스타일 프리셋 정의 ──────────────────────────────
 export const STYLE_PRESETS = {
@@ -110,7 +113,8 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
                 ? settings.directModel
                 : `models/${settings.directModel}`;
 
-            const temperature = parseFloat(settings.temperature) || 0.3;
+            const baseTemp = parseFloat(settings.temperature) || 0.3;
+            const temperature = prevTranslation ? Math.min(baseTemp + 0.3, 1.0) : baseTemp;
             const maxTokens = parseInt(settings.maxTokens) || 8192;
 
             const data = await fetchWithRetry(
@@ -135,7 +139,16 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
         // 5️⃣ 결과 세탁
         let cleaned = cleanResult(result);
 
-        if (!cleaned) return { text: text, lang: targetLang, fromCache: false };
+        // 🛡️ 빈 결과/엉뚱한 결과 방어
+        if (!cleaned || cleaned.length < 2) {
+            catNotify(`${getThemeEmoji()} 번역 결과가 비어있습니다. 원문 유지.`, "warning");
+            return null;
+        }
+        // 결과가 원문 대비 90% 이상 짧으면 의심
+        if (cleaned.length < text.length * 0.1 && text.length > 50) {
+            catNotify(`${getThemeEmoji()} 번역 결과가 너무 짧습니다. 원문 유지.`, "warning");
+            return null;
+        }
 
         // 6️⃣ 캐시 저장 (Thought 포함)
         await setCached(text, targetLang, cleaned, thought);
@@ -175,9 +188,10 @@ function assemblePrompt(text, targetLang, isToEnglish, settings, options = {}) {
         parts.push(`[Additional instructions: ${settings.userPrompt.trim()}]`);
     }
 
-    // 재번역 지시
+    // 재번역 지시 (더 강력하게)
     if (prevTranslation) {
-        parts.push(`[Provide a DIFFERENT translation than: "${prevTranslation}"]`);
+        parts.push(`[MANDATORY: Your translation MUST be COMPLETELY DIFFERENT from this: "${prevTranslation.substring(0, 200)}"]`);
+        parts.push(`[Use different vocabulary, sentence structure, and tone. Do NOT produce a similar result.]`);
     }
 
     // 문맥 메시지

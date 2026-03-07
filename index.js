@@ -111,7 +111,7 @@ async function doTranslateMessage(msgId, msg, textToTranslate, isInput, prevTran
         abortSignal
     });
 
-    if (result && result.text !== textToTranslate) {
+    if (result && result.text && result.text.trim() && result.text !== textToTranslate) {
         if (!msg.extra) msg.extra = {};
         if (isInput) {
             if (!msg.extra.original_mes) msg.extra.original_mes = textToTranslate;

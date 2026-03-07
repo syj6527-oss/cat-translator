@@ -191,13 +191,21 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.3em;
-    margin-right: 2px;
-    padding: 2px 4px;
+    font-size: 1.15em;
+    margin: 0;
+    padding: 2px 3px;
     border-radius: 4px;
     transition: background 0.2s, transform 0.2s;
     flex-shrink: 0;
     vertical-align: middle;
+}
+
+#cat-input-wrap {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 1px !important;
+    flex-shrink: 0 !important;
+    margin-right: 2px;
 }
 
 .cat-input-icon:hover {

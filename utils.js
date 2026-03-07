@@ -63,7 +63,8 @@ export function cleanResult(text) {
 export function getModelTheme(modelName) {
     if (!modelName) return 'cat';
     const lower = modelName.toLowerCase();
-    if (lower.includes('pro')) return 'tiger';
+    if (lower.includes('pro') || lower.includes('프로')) return 'tiger';
+    if (lower.includes('flash') || lower.includes('플래') || lower.includes('플레')) return 'cat';
     return 'cat';
 }
 

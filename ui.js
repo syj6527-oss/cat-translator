@@ -183,14 +183,14 @@ export function setupSettingsPanel(settings, stContext, saveSettingsFn) {
     $('#ct-profile').val(settings.profile).on('change', function () {
         settings.profile = $(this).val();
         $('#ct-direct-settings').toggle(settings.profile === '');
-        // 프리셋 이름에서 pro/flash 감지하여 테마 전환
+        // 프리셋 이름에서 pro/flash/프로/플래쉬 감지하여 테마 전환
         const profileName = $(this).find('option:selected').text().toLowerCase();
-        if (profileName.includes('pro')) {
+        if (profileName.includes('pro') || profileName.includes('프로')) {
             applyTheme('tiger');
+        } else if (profileName.includes('flash') || profileName.includes('플래') || profileName.includes('플레')) {
+            applyTheme('cat');
         } else if (settings.profile === '') {
             applyTheme(getModelTheme(settings.directModel));
-        } else {
-            applyTheme('cat');
         }
     });
 
@@ -206,6 +206,15 @@ export function setupSettingsPanel(settings, stContext, saveSettingsFn) {
     $('#ct-auto-mode').val(settings.autoMode);
     $('#ct-lang').val(settings.targetLang);
     $('#ct-temperature').val(settings.temperature || 0.3);
+
+    // 사전 즉시 동기화 (입력할 때마다 settings에 반영)
+    $('#ct-dictionary').on('input', function () {
+        settings.dictionary = $(this).val();
+    });
+    // 추가 지시사항도 즉시 동기화
+    $('#ct-user-prompt').on('input', function () {
+        settings.userPrompt = $(this).val();
+    });
 
     // 저장
     $('#cat-save-btn').on('click', () => {
@@ -310,7 +319,7 @@ export function injectInputButtons(settings, stContext, processMessageFn) {
     const emoji = getThemeEmoji();
 
     // 버튼들을 가로 flex 컨테이너로 감싸기
-    const btnWrap = $(`<div id="cat-input-wrap" style="display:inline-flex; align-items:center; gap:2px; flex-shrink:0;"></div>`);
+    const btnWrap = $(`<div id="cat-input-wrap"></div>`);
 
     // 번역 버튼
     const transBtn = $(`<div id="cat-input-btn" title="번역" class="cat-input-icon interactable"><span class="cat-emoji-icon">${emoji}</span></div>`);
@@ -605,22 +614,29 @@ export async function showHistoryPopup(originalText, targetLang, anchorEl, onSel
 export function setupDragDictionary(settings, saveSettingsFn) {
     let pawIcon = null;
 
-    // 채팅 영역에서 텍스트 선택 감지
-    $(document).on('mouseup touchend', '#chat', function (e) {
-        // 모바일에서 OS 선택 메뉴와 겹치지 않게 딜레이
-        setTimeout(() => {
+    // 채팅 영역에서 텍스트 선택 감지 (selectionchange로 정확히 잡기)
+    let _dragDebounce = null;
+    document.addEventListener('selectionchange', () => {
+        clearTimeout(_dragDebounce);
+        _dragDebounce = setTimeout(() => {
             const selection = window.getSelection();
             const selectedText = selection?.toString()?.trim();
 
             // 기존 팝업 제거
-            $('.cat-drag-paw, .cat-drag-popup').remove();
+            $('.cat-drag-paw').remove();
 
             if (!selectedText || selectedText.length === 0 || selectedText.length > 100) return;
 
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
+            // 선택이 #chat 내부인지 확인
+            const anchorNode = selection.anchorNode;
+            if (!anchorNode || !$(anchorNode).closest('#chat').length) return;
 
-            // 🐾 아이콘 소환 (선택 영역 아래, 모바일은 조금 더 아래로)
+            let range;
+            try { range = selection.getRangeAt(0); } catch (e) { return; }
+            const rect = range.getBoundingClientRect();
+            if (rect.width === 0) return;
+
+            // 🐾 아이콘 소환
             pawIcon = $(`<div class="cat-drag-paw" title="사전 등록">🐾</div>`);
             const isMobile = window.innerWidth < 768;
             const topOffset = isMobile ? rect.bottom + 12 : rect.bottom + 4;
@@ -638,9 +654,9 @@ export function setupDragDictionary(settings, saveSettingsFn) {
                 pawIcon.remove();
             });
 
-            // 3초 후 자동 제거
-            setTimeout(() => pawIcon?.remove(), 3000);
-        }, 300);
+            // 5초 후 자동 제거
+            setTimeout(() => pawIcon?.remove(), 5000);
+        }, 400);
     });
 
     // 다른 곳 클릭하면 제거
