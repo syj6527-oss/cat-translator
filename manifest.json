@@ -1,7 +1,7 @@
 {
     "name": "cat-translator",
     "display_name": "🐱 트랜스레이터",
-    "version": "18.0.7",
+    "version": "18.0.8",
     "description": "호랑이 각성: RP 몰입 번역 어시스턴트",
     "author": "냥헴 & GPT & Claude",
     "js": "index.js",

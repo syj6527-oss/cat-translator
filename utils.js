@@ -61,7 +61,7 @@ export function cleanResult(text) {
 
 // ─── 모델 테마 판별 (프리셋 이름도 감지) ──────────────
 export function getModelTheme(modelName) {
-    if (!modelName) return 'cat';
+    if (!modelName || typeof modelName !== 'string') return 'cat';
     const lower = modelName.toLowerCase();
     if (lower.includes('pro') || lower.includes('프로')) return 'tiger';
     if (lower.includes('flash') || lower.includes('플래') || lower.includes('플레')) return 'cat';

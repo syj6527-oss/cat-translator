@@ -71,11 +71,11 @@ async function processMessage(id, isInput = false, abortSignal = null, silent = 
             return;
         }
 
-        // 📝 일반 모드
-        let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
+        // 📝 일반 모드 — 항상 원본에서 읽기
+        let textToTranslate = msg.extra?.original_mes || msg.mes;
 
         // 재번역 감지: 이미 번역된 메시지면 prevTranslation 설정
-        const existingTranslation = !isInput ? msg.extra?.display_text : null;
+        const existingTranslation = msg.extra?.display_text || null;
         const isRetranslation = !!existingTranslation;
 
         // 히스토리 팝업 (3회 이상 재번역 시)
@@ -88,6 +88,7 @@ async function processMessage(id, isInput = false, abortSignal = null, silent = 
                 } else if (selectedText) {
                     if (!msg.extra) msg.extra = {};
                     msg.extra.display_text = selectedText;
+                    msg.mes = selectedText;
                     stContext.updateMessageBlock(msgId, msg);
                 }
             });
@@ -104,13 +105,12 @@ async function processMessage(id, isInput = false, abortSignal = null, silent = 
 
 // ─── 실제 번역 수행 ────────────────────────────────
 async function doTranslateMessage(msgId, msg, textToTranslate, isInput, prevTranslation, abortSignal, silent = false) {
-    const forceLang = isInput ? "English" : null;
     const contextRange = parseInt(settings.contextRange) || 1;
     const contextMsgs = gatherContextMessages(msgId, stContext, contextRange);
 
     const result = await fetchTranslation(textToTranslate, settings, stContext, {
-        forceLang,
-        prevTranslation: isInput ? (msg.extra?.original_mes ? msg.mes : null) : prevTranslation,
+        forceLang: null, // 항상 스마트 감지 사용
+        prevTranslation: prevTranslation,
         contextMessages: contextMsgs,
         abortSignal,
         silent
@@ -118,12 +118,11 @@ async function doTranslateMessage(msgId, msg, textToTranslate, isInput, prevTran
 
     if (result && result.text && result.text.trim() && result.text !== textToTranslate) {
         if (!msg.extra) msg.extra = {};
-        if (isInput) {
-            if (!msg.extra.original_mes) msg.extra.original_mes = textToTranslate;
-            msg.mes = result.text;
-        } else {
-            msg.extra.display_text = result.text;
-        }
+        // 원본 백업 (최초 1회만)
+        if (!msg.extra.original_mes) msg.extra.original_mes = textToTranslate;
+        // display_text + msg.mes 둘 다 수정 (memo/profile 블록 번역 대응)
+        msg.extra.display_text = result.text;
+        msg.mes = result.text;
         stContext.updateMessageBlock(msgId, msg);
     }
 }
