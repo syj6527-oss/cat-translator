@@ -273,6 +273,7 @@ export function updateCacheStats() {
 }
 
 // ─── 테마 적용 (새로고침 없이 실시간 전환) ────────────
+let _lastAppliedTheme = null;
 export function applyTheme(theme) {
     document.body.setAttribute('data-cat-theme', theme);
     const emoji = theme === 'tiger' ? '🐯' : '🐱';
@@ -282,6 +283,15 @@ export function applyTheme(theme) {
     $('.cat-mes-trans-btn .cat-emoji-icon').text(emoji);
     // 입력창 버튼 이모지
     $('#cat-input-btn .cat-emoji-icon').text(emoji);
+    // 귀여운 알림 (최초 로드가 아닐 때만)
+    if (_lastAppliedTheme !== null && _lastAppliedTheme !== theme) {
+        if (theme === 'tiger') {
+            catNotify('🐯 어흥! 호랑이 모드 활성화!', 'success');
+        } else {
+            catNotify('🐱 야옹~ 고양이 모드 활성화!', 'success');
+        }
+    }
+    _lastAppliedTheme = theme;
 }
 
 // ─── 입력창 버튼 주입 ───────────────────────────────
@@ -307,7 +317,7 @@ export function injectInputButtons(settings, stContext, processMessageFn) {
     // 되돌리기 버튼
     const revertBtn = $(`<div id="cat-input-revert" title="되돌리기" class="cat-input-icon interactable"><i class="fa-solid fa-rotate-left"></i></div>`);
     // 전체 번역 버튼
-    const bulkBtn = $(`<div id="cat-bulk-btn" title="전체 번역" class="cat-input-icon interactable"><i class="fa-solid fa-language"></i></div>`);
+    const bulkBtn = $(`<div id="cat-bulk-btn" title="전체 번역" class="cat-input-icon interactable"><span class="cat-emoji-icon">🚀</span></div>`);
 
     btnWrap.append(transBtn).append(revertBtn).append(bulkBtn);
     target.before(btnWrap);
@@ -381,25 +391,32 @@ export function injectMessageButtons(processMessageFn, revertMessageFn) {
     $('.mes:not(:has(.cat-btn-group))').each(function () {
         const msgId = $(this).attr('mesid');
         if (!msgId) return;
-        const isUser = $(this).hasClass('mes_user');
         const emoji = getThemeEmoji();
 
         const group = $(`
             <div class="cat-btn-group">
-                <span class="cat-mes-trans-btn interactable" title="번역"><span class="cat-emoji-icon">${emoji}</span></span>
-                <span class="cat-mes-revert-btn interactable" title="복구"><i class="fa-solid fa-rotate-left"></i></span>
+                <span class="cat-mes-trans-btn interactable" title="번역" data-mesid="${msgId}"><span class="cat-emoji-icon">${emoji}</span></span>
+                <span class="cat-mes-revert-btn interactable" title="복구" data-mesid="${msgId}"><i class="fa-solid fa-rotate-left"></i></span>
             </div>`);
 
         $(this).find('.name_text').append(group);
-        group.find('.cat-mes-trans-btn').on('click', (e) => {
-            e.stopPropagation();
-            processMessageFn(msgId, isUser);
-        });
-        group.find('.cat-mes-revert-btn').on('click', (e) => {
-            e.stopPropagation();
-            revertMessageFn(msgId);
-        });
     });
+
+    // 이벤트 위임: 부모에서 한 번만 등록 (DOM 교체에 안전)
+    if (!window._catMesBtnDelegated) {
+        window._catMesBtnDelegated = true;
+        $(document).on('click', '.cat-mes-trans-btn', function (e) {
+            e.stopPropagation();
+            const msgId = $(this).data('mesid') || $(this).closest('.mes').attr('mesid');
+            const isUser = $(this).closest('.mes').hasClass('mes_user');
+            if (msgId !== undefined) processMessageFn(msgId, isUser);
+        });
+        $(document).on('click', '.cat-mes-revert-btn', function (e) {
+            e.stopPropagation();
+            const msgId = $(this).data('mesid') || $(this).closest('.mes').attr('mesid');
+            if (msgId !== undefined) revertMessageFn(msgId);
+        });
+    }
 }
 
 // ─── 벌크 번역 팝업 ────────────────────────────────
@@ -468,7 +485,7 @@ async function executeBulkTranslation(count, settings, stContext, processMessage
     let completed = 0;
 
     // 벌크 아이콘 변경
-    $('#cat-bulk-btn').html('<i class="fa-solid fa-xmark" style="color:#e74c3c;"></i>');
+    $('#cat-bulk-btn').html('<span class="cat-emoji-icon" style="filter:grayscale(1);">🚀</span>');
     const abortHandler = () => {
         if (bulkAbortController) bulkAbortController.abort();
     };
@@ -503,7 +520,7 @@ async function executeBulkTranslation(count, settings, stContext, processMessage
     // 복원
     progressEl.remove();
     const emoji = getThemeEmoji();
-    $('#cat-bulk-btn').html(`<i class="fa-solid fa-language"></i>`);
+    $('#cat-bulk-btn').html('<span class="cat-emoji-icon">🚀</span>');
     $('#cat-bulk-btn').off('click').on('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -523,7 +540,7 @@ export async function showHistoryPopup(originalText, targetLang, anchorEl, onSel
     $('.cat-history-popup').remove();
     const history = await getHistory(originalText, targetLang);
 
-    if (history.length < 2) return false; // 히스토리 부족, 팝업 안 띄움
+    if (history.length < 3) return false; // 3회 이상 재번역 시 팝업
 
     // 핀된 항목 상단
     const sorted = [...history].sort((a, b) => {
@@ -603,10 +620,10 @@ export function setupDragDictionary(settings, saveSettingsFn) {
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();
 
-            // 🐾 아이콘 소환 (선택 영역 아래, 모바일은 더 아래로)
+            // 🐾 아이콘 소환 (선택 영역 아래, 모바일은 조금 더 아래로)
             pawIcon = $(`<div class="cat-drag-paw" title="사전 등록">🐾</div>`);
             const isMobile = window.innerWidth < 768;
-            const topOffset = isMobile ? rect.bottom + 40 : rect.bottom + 4;
+            const topOffset = isMobile ? rect.bottom + 12 : rect.bottom + 4;
             pawIcon.css({
                 position: 'fixed',
                 top: Math.min(topOffset, window.innerHeight - 50) + 'px',
@@ -648,12 +665,26 @@ function showDragDictPopup(selectedText, rect, settings, saveSettingsFn) {
         </div>
     `);
 
-    popup.css({
-        position: 'fixed',
-        top: (rect.bottom + 8) + 'px',
-        left: Math.max(8, rect.left - 20) + 'px',
-        zIndex: 99999
-    });
+    // 모바일: 키보드에 가려지지 않도록 화면 상단 고정
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) {
+        popup.css({
+            position: 'fixed',
+            top: '60px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            width: 'calc(100vw - 32px)',
+            maxWidth: '320px'
+        });
+    } else {
+        popup.css({
+            position: 'fixed',
+            top: (rect.bottom + 8) + 'px',
+            left: Math.max(8, rect.left - 20) + 'px',
+            zIndex: 99999
+        });
+    }
 
     $('body').append(popup);
     popup.find('.cat-drag-input').focus();

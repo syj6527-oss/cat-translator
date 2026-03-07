@@ -70,26 +70,28 @@ async function processMessage(id, isInput = false, abortSignal = null) {
         // 📝 일반 모드
         let textToTranslate = isInput ? (msg.extra?.original_mes || msg.mes) : msg.mes;
 
-        // 히스토리 체크 (재번역 시 팝업)
-        const isRetranslation = !isInput && msg.extra?.display_text;
+        // 재번역 감지: 이미 번역된 메시지면 prevTranslation 설정
+        const existingTranslation = !isInput ? msg.extra?.display_text : null;
+        const isRetranslation = !!existingTranslation;
+
+        // 히스토리 팝업 (3회 이상 재번역 시)
         if (isRetranslation) {
             const anchorEl = mesBlock.find('.cat-mes-trans-btn');
             const detected = detectDir(textToTranslate);
             const shown = await showHistoryPopup(textToTranslate, detected.targetLang, anchorEl, (selectedText, isNew) => {
                 if (isNew) {
-                    // 새 번역 요청
-                    doTranslateMessage(msgId, msg, textToTranslate, isInput, msg.extra?.display_text, abortSignal);
+                    doTranslateMessage(msgId, msg, textToTranslate, isInput, existingTranslation, abortSignal);
                 } else if (selectedText) {
-                    // 기존 번역 선택
                     if (!msg.extra) msg.extra = {};
                     msg.extra.display_text = selectedText;
                     stContext.updateMessageBlock(msgId, msg);
                 }
             });
-            if (shown) return; // 팝업이 떴으면 여기서 리턴
+            if (shown) return; // 팝업이 떴으면 팝업에서 처리
         }
 
-        await doTranslateMessage(msgId, msg, textToTranslate, isInput, null, abortSignal);
+        // 번역 실행 (재번역이면 prevTranslation 넘겨서 다른 표현 요청)
+        await doTranslateMessage(msgId, msg, textToTranslate, isInput, existingTranslation, abortSignal);
 
     } finally {
         btnIcon.removeClass('cat-glow-anim');
