@@ -55,35 +55,16 @@ export function cleanResult(text) {
         .replace(/^(번역|Translation|Output|Input|Result):\s*/gi, "")
         .replace(/```[\s\S]*?```/g, "")
         .replace(/`([^`]+)`/g, "$1")
-        .replace(/\{+(.*?)\}+/g, "$1")
         .replace(/\s{2,}/g, " ")
         .trim();
 }
 
-// ─── HTML/CSS 방어 시스템 ──────────────────────────────
-const TAG_PLACEHOLDER_PREFIX = '{{CAT_TAG_';
-const TAG_PLACEHOLDER_SUFFIX = '}}';
-
-export function protectHtmlTags(text) {
-    if (!text) return { cleaned: text, tags: [] };
-    const tags = [];
-    // HTML 태그 + 인라인 스타일 전체 보호
-    const cleaned = text.replace(/<[^>]+>/g, (match) => {
-        const idx = tags.length;
-        tags.push(match);
-        return `${TAG_PLACEHOLDER_PREFIX}${idx}${TAG_PLACEHOLDER_SUFFIX}`;
-    });
-    return { cleaned, tags };
-}
-
-export function restoreHtmlTags(text, tags) {
-    if (!tags || tags.length === 0) return text;
-    let restored = text;
-    tags.forEach((tag, idx) => {
-        const placeholder = `${TAG_PLACEHOLDER_PREFIX}${idx}${TAG_PLACEHOLDER_SUFFIX}`;
-        restored = restored.replace(placeholder, tag);
-    });
-    return restored;
+// ─── 모델 테마 판별 (프리셋 이름도 감지) ──────────────
+export function getModelTheme(modelName) {
+    if (!modelName) return 'cat';
+    const lower = modelName.toLowerCase();
+    if (lower.includes('pro')) return 'tiger';
+    return 'cat';
 }
 
 // ─── 언어 감지 (70% 룰) ─────────────────────────────
@@ -141,14 +122,6 @@ export function applyPreReplace(text, dictionary, isToEnglish) {
 export function normalizeText(text) {
     if (!text) return "";
     return text.toLowerCase().replace(/[^a-z가-힣0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g, '').trim();
-}
-
-// ─── 모델 테마 판별 ───────────────────────────────────
-export function getModelTheme(modelName) {
-    if (!modelName) return 'cat';
-    const lower = modelName.toLowerCase();
-    if (lower.includes('pro')) return 'tiger';
-    return 'cat';
 }
 
 // ─── 네이티브 textarea 값 설정 ────────────────────────

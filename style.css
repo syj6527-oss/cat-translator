@@ -196,6 +196,8 @@
     padding: 2px 4px;
     border-radius: 4px;
     transition: background 0.2s, transform 0.2s;
+    flex-shrink: 0;
+    vertical-align: middle;
 }
 
 .cat-input-icon:hover {
@@ -389,6 +391,14 @@
         padding: 4px;
     }
 
+    #cat-input-wrap {
+        display: inline-flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 1px !important;
+        flex-shrink: 0 !important;
+    }
+
     .cat-notification {
         font-size: 12px;
         padding: 8px 16px;
@@ -408,5 +418,10 @@
     .cat-mes-trans-btn,
     .cat-mes-revert-btn {
         font-size: 1.1em;
+    }
+
+    /* 문맥 범위 UI 정렬 수정 */
+    #cat-drawer-content [style*="display:flex"] {
+        flex-wrap: nowrap !important;
     }
 }

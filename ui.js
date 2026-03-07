@@ -175,12 +175,23 @@ export function setupSettingsPanel(settings, stContext, saveSettingsFn) {
             applyTheme(getModelTheme(val));
         }
     });
-    $('#ct-model-custom').val(settings.customModelName || '');
+    $('#ct-model-custom').val(settings.customModelName || '').on('input', function () {
+        applyTheme(getModelTheme($(this).val()));
+    });
 
-    // 프로필 변경
+    // 프로필 변경 → 테마 자동 감지
     $('#ct-profile').val(settings.profile).on('change', function () {
         settings.profile = $(this).val();
         $('#ct-direct-settings').toggle(settings.profile === '');
+        // 프리셋 이름에서 pro/flash 감지하여 테마 전환
+        const profileName = $(this).find('option:selected').text().toLowerCase();
+        if (profileName.includes('pro')) {
+            applyTheme('tiger');
+        } else if (settings.profile === '') {
+            applyTheme(getModelTheme(settings.directModel));
+        } else {
+            applyTheme('cat');
+        }
     });
 
     // 스타일 → 온도 자동 설정
@@ -261,16 +272,21 @@ export function updateCacheStats() {
     $('#ct-cache-stats').text(`캐시 히트율: ${s.hitRate}% | 절약 토큰: ~${s.tokensSaved.toLocaleString()}`);
 }
 
-// ─── 테마 적용 ──────────────────────────────────────
+// ─── 테마 적용 (새로고침 없이 실시간 전환) ────────────
 export function applyTheme(theme) {
     document.body.setAttribute('data-cat-theme', theme);
     const emoji = theme === 'tiger' ? '🐯' : '🐱';
+    // 설정 패널 이모지
     $('.cat-theme-emoji').text(emoji);
+    // 메시지 버튼 이모지
+    $('.cat-mes-trans-btn .cat-emoji-icon').text(emoji);
+    // 입력창 버튼 이모지
+    $('#cat-input-btn .cat-emoji-icon').text(emoji);
 }
 
 // ─── 입력창 버튼 주입 ───────────────────────────────
 export function injectInputButtons(settings, stContext, processMessageFn) {
-    if ($('#cat-input-btn').length > 0) {
+    if ($('#cat-input-wrap').length > 0) {
         // 이미 존재하면 발광 상태만 업데이트
         const icon = $('#cat-input-btn .cat-emoji-icon');
         if (isTranslatingInput) icon.addClass('cat-glow-anim');
@@ -283,6 +299,9 @@ export function injectInputButtons(settings, stContext, processMessageFn) {
 
     const emoji = getThemeEmoji();
 
+    // 버튼들을 가로 flex 컨테이너로 감싸기
+    const btnWrap = $(`<div id="cat-input-wrap" style="display:inline-flex; align-items:center; gap:2px; flex-shrink:0;"></div>`);
+
     // 번역 버튼
     const transBtn = $(`<div id="cat-input-btn" title="번역" class="cat-input-icon interactable"><span class="cat-emoji-icon">${emoji}</span></div>`);
     // 되돌리기 버튼
@@ -290,7 +309,8 @@ export function injectInputButtons(settings, stContext, processMessageFn) {
     // 전체 번역 버튼
     const bulkBtn = $(`<div id="cat-bulk-btn" title="전체 번역" class="cat-input-icon interactable"><i class="fa-solid fa-language"></i></div>`);
 
-    target.before(transBtn).before(revertBtn).before(bulkBtn);
+    btnWrap.append(transBtn).append(revertBtn).append(bulkBtn);
+    target.before(btnWrap);
 
     // 번역 클릭
     transBtn.on('click', async (e) => {
@@ -570,35 +590,40 @@ export function setupDragDictionary(settings, saveSettingsFn) {
 
     // 채팅 영역에서 텍스트 선택 감지
     $(document).on('mouseup touchend', '#chat', function (e) {
-        const selection = window.getSelection();
-        const selectedText = selection?.toString()?.trim();
+        // 모바일에서 OS 선택 메뉴와 겹치지 않게 딜레이
+        setTimeout(() => {
+            const selection = window.getSelection();
+            const selectedText = selection?.toString()?.trim();
 
-        // 기존 팝업 제거
-        $('.cat-drag-paw, .cat-drag-popup').remove();
+            // 기존 팝업 제거
+            $('.cat-drag-paw, .cat-drag-popup').remove();
 
-        if (!selectedText || selectedText.length === 0 || selectedText.length > 100) return;
+            if (!selectedText || selectedText.length === 0 || selectedText.length > 100) return;
 
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
 
-        // 🐾 아이콘 소환 (선택 영역 바로 아래)
-        pawIcon = $(`<div class="cat-drag-paw" title="사전 등록">🐾</div>`);
-        pawIcon.css({
-            position: 'fixed',
-            top: (rect.bottom + 4) + 'px',
-            left: (rect.left + rect.width / 2 - 14) + 'px',
-            zIndex: 99999
-        });
-        $('body').append(pawIcon);
+            // 🐾 아이콘 소환 (선택 영역 아래, 모바일은 더 아래로)
+            pawIcon = $(`<div class="cat-drag-paw" title="사전 등록">🐾</div>`);
+            const isMobile = window.innerWidth < 768;
+            const topOffset = isMobile ? rect.bottom + 40 : rect.bottom + 4;
+            pawIcon.css({
+                position: 'fixed',
+                top: Math.min(topOffset, window.innerHeight - 50) + 'px',
+                left: Math.max(8, rect.left + rect.width / 2 - 14) + 'px',
+                zIndex: 99999
+            });
+            $('body').append(pawIcon);
 
-        pawIcon.on('click', (ev) => {
-            ev.stopPropagation();
-            showDragDictPopup(selectedText, rect, settings, saveSettingsFn);
-            pawIcon.remove();
-        });
+            pawIcon.on('click', (ev) => {
+                ev.stopPropagation();
+                showDragDictPopup(selectedText, rect, settings, saveSettingsFn);
+                pawIcon.remove();
+            });
 
-        // 3초 후 자동 제거
-        setTimeout(() => pawIcon?.remove(), 3000);
+            // 3초 후 자동 제거
+            setTimeout(() => pawIcon?.remove(), 3000);
+        }, 300);
     });
 
     // 다른 곳 클릭하면 제거

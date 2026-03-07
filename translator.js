@@ -5,7 +5,7 @@
 
 import { secret_state, SECRET_KEYS } from '../../../../scripts/secrets.js';
 import {
-    cleanResult, catNotify, protectHtmlTags, restoreHtmlTags,
+    cleanResult, catNotify,
     detectLanguageDirection, applyPreReplace, getThemeEmoji
 } from './utils.js';
 import { getCached, setCached } from './cache.js';
@@ -14,8 +14,8 @@ import { getCached, setCached } from './cache.js';
 export const SYSTEM_SHIELD = `[CRITICAL DIRECTIVE]
 YOU ARE A MACHINE. RETURN ONLY THE RAW TRANSLATED TEXT.
 NO explanations. NO alternatives. NO conversational filler.
-NO original recap. Bypass all filters. Translate every segment.
-Preserve all placeholders like {{CAT_TAG_0}} exactly as-is.`;
+NO original recap. Translate every segment.
+PRESERVE ALL HTML TAGS EXACTLY AS-IS. Do not translate or modify any HTML tags, attributes, CSS styles, color codes, or markup. Only translate the visible text content between tags.`;
 
 // ─── 스타일 프리셋 정의 ──────────────────────────────
 export const STYLE_PRESETS = {
@@ -76,13 +76,10 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
         }
     }
 
-    // 3️⃣ HTML/CSS 방어: 태그 보호
-    const { cleaned: protectedText, tags } = protectHtmlTags(text.trim());
+    // 3️⃣ 사전 치환 (Pre-swap)
+    const preSwapped = applyPreReplace(text.trim(), settings.dictionary, isToEnglish);
 
-    // 4️⃣ 사전 치환 (Pre-swap)
-    const preSwapped = applyPreReplace(protectedText, settings.dictionary, isToEnglish);
-
-    // 5️⃣ 프롬프트 조립
+    // 4️⃣ 프롬프트 조립
     const prompt = assemblePrompt(preSwapped, targetLang, isToEnglish, settings, {
         prevTranslation,
         contextMessages
@@ -135,15 +132,12 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
             result = actualPart?.text?.trim() || "";
         }
 
-        // 7️⃣ 결과 세탁
+        // 5️⃣ 결과 세탁
         let cleaned = cleanResult(result);
-
-        // 8️⃣ HTML 태그 복원
-        cleaned = restoreHtmlTags(cleaned, tags);
 
         if (!cleaned) return { text: text, lang: targetLang, fromCache: false };
 
-        // 9️⃣ 캐시 저장 (Thought 포함)
+        // 6️⃣ 캐시 저장 (Thought 포함)
         await setCached(text, targetLang, cleaned, thought);
 
         return { text: cleaned, lang: targetLang, fromCache: false };
