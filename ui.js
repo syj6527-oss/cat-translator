@@ -212,15 +212,23 @@ export function setupSettingsPanel(settings, stContext, saveSettingsFn) {
         settings.dictionary = $(this).val();
     });
     // 사전 리셋
-    $('#ct-dict-reset').on('click', () => {
+    $('#ct-dict-reset').on('click', async () => {
         $('#ct-dictionary').val('');
         settings.dictionary = '';
         saveSettingsFn();
-        catNotify(`${getThemeEmoji()} 사전 초기화 완료!`, "success");
+        await clearAllCache();
+        updateCacheStats();
+        catNotify(`${getThemeEmoji()} 사전 초기화 + 캐시 클리어 완료!`, "success");
     });
     // 추가 지시사항도 즉시 동기화
     $('#ct-user-prompt').on('input', function () {
         settings.userPrompt = $(this).val();
+    });
+    // 문맥 범위 0~3 강제 클램핑
+    $('#ct-context-range').on('change', function () {
+        let val = parseInt($(this).val()) || 0;
+        val = Math.min(3, Math.max(0, val));
+        $(this).val(val);
     });
 
     // 저장
@@ -276,7 +284,7 @@ export function collectSettings() {
         style: $('#ct-style').val() || 'normal',
         temperature: parseFloat($('#ct-temperature').val()) || 0.3,
         maxTokens: parseInt($('#ct-max-tokens').val()) || 8192,
-        contextRange: parseInt($('#ct-context-range').val()) || 1,
+        contextRange: Math.min(3, Math.max(0, parseInt($('#ct-context-range').val()) || 1)),
         userPrompt: $('#ct-user-prompt').val() || '',
         dictionary: $('#ct-dictionary').val() || ''
     };
@@ -520,7 +528,7 @@ async function executeBulkTranslation(count, settings, stContext, processMessage
 
         const msgId = el.attr('mesid');
         const isUser = el.hasClass('mes_user');
-        await processMessageFn(msgId, isUser, bulkAbortController.signal);
+        await processMessageFn(msgId, isUser, bulkAbortController.signal, true);
 
         completed++;
         if (progressEl.length) {
@@ -624,20 +632,18 @@ export async function showHistoryPopup(originalText, targetLang, anchorEl, onSel
 export function setupDragDictionary(settings, saveSettingsFn) {
     let pawIcon = null;
 
-    // 채팅 영역에서 텍스트 선택 감지 (selectionchange로 정확히 잡기)
+    // 채팅 영역에서 텍스트 선택 감지 (selectionchange + mouseup 병행)
     let _dragDebounce = null;
-    document.addEventListener('selectionchange', () => {
+    const handleSelection = () => {
         clearTimeout(_dragDebounce);
         _dragDebounce = setTimeout(() => {
             const selection = window.getSelection();
             const selectedText = selection?.toString()?.trim();
 
-            // 기존 팝업 제거
             $('.cat-drag-paw').remove();
 
             if (!selectedText || selectedText.length === 0 || selectedText.length > 100) return;
 
-            // 선택이 #chat 내부인지 확인
             const anchorNode = selection.anchorNode;
             if (!anchorNode || !$(anchorNode).closest('#chat').length) return;
 
@@ -646,7 +652,6 @@ export function setupDragDictionary(settings, saveSettingsFn) {
             const rect = range.getBoundingClientRect();
             if (rect.width === 0) return;
 
-            // 🐾 아이콘 소환
             pawIcon = $(`<div class="cat-drag-paw" title="사전 등록">🐾</div>`);
             const isMobile = window.innerWidth < 768;
             const topOffset = isMobile ? rect.bottom + 12 : rect.bottom + 4;
@@ -664,10 +669,12 @@ export function setupDragDictionary(settings, saveSettingsFn) {
                 pawIcon.remove();
             });
 
-            // 5초 후 자동 제거
-            setTimeout(() => pawIcon?.remove(), 5000);
-        }, 400);
-    });
+            setTimeout(() => pawIcon?.remove(), 8000);
+        }, 200);
+    };
+
+    document.addEventListener('selectionchange', handleSelection);
+    $(document).on('mouseup touchend', '#chat', handleSelection);
 
     // 다른 곳 클릭하면 제거
     $(document).on('mousedown', (e) => {

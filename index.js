@@ -47,7 +47,7 @@ function saveSettings() {
 }
 
 // ─── 메시지 번역 처리 ───────────────────────────────
-async function processMessage(id, isInput = false, abortSignal = null) {
+async function processMessage(id, isInput = false, abortSignal = null, silent = false) {
     const msgId = parseInt(id, 10);
     const msg = stContext.chat[msgId];
     if (!msg) return;
@@ -84,7 +84,7 @@ async function processMessage(id, isInput = false, abortSignal = null) {
             const detected = detectDir(textToTranslate);
             const shown = await showHistoryPopup(textToTranslate, detected.targetLang, anchorEl, (selectedText, isNew) => {
                 if (isNew) {
-                    doTranslateMessage(msgId, msg, textToTranslate, isInput, existingTranslation, abortSignal);
+                    doTranslateMessage(msgId, msg, textToTranslate, isInput, existingTranslation, abortSignal, true);
                 } else if (selectedText) {
                     if (!msg.extra) msg.extra = {};
                     msg.extra.display_text = selectedText;
@@ -95,7 +95,7 @@ async function processMessage(id, isInput = false, abortSignal = null) {
         }
 
         // 번역 실행 (재번역이면 prevTranslation 넘겨서 다른 표현 요청)
-        await doTranslateMessage(msgId, msg, textToTranslate, isInput, existingTranslation, abortSignal);
+        await doTranslateMessage(msgId, msg, textToTranslate, isInput, existingTranslation, abortSignal, silent);
 
     } finally {
         stopGlow();
@@ -103,7 +103,7 @@ async function processMessage(id, isInput = false, abortSignal = null) {
 }
 
 // ─── 실제 번역 수행 ────────────────────────────────
-async function doTranslateMessage(msgId, msg, textToTranslate, isInput, prevTranslation, abortSignal) {
+async function doTranslateMessage(msgId, msg, textToTranslate, isInput, prevTranslation, abortSignal, silent = false) {
     const forceLang = isInput ? "English" : null;
     const contextRange = parseInt(settings.contextRange) || 1;
     const contextMsgs = gatherContextMessages(msgId, stContext, contextRange);
@@ -112,7 +112,8 @@ async function doTranslateMessage(msgId, msg, textToTranslate, isInput, prevTran
         forceLang,
         prevTranslation: isInput ? (msg.extra?.original_mes ? msg.mes : null) : prevTranslation,
         contextMessages: contextMsgs,
-        abortSignal
+        abortSignal,
+        silent
     });
 
     if (result && result.text && result.text.trim() && result.text !== textToTranslate) {

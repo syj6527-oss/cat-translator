@@ -16,8 +16,8 @@ YOU ARE A TRANSLATION MACHINE. NOT A CHATBOT. NOT AN ASSISTANT.
 RETURN ONLY THE RAW TRANSLATED TEXT. NOTHING ELSE.
 DO NOT respond. DO NOT converse. DO NOT explain. DO NOT add commentary.
 DO NOT repeat the original. DO NOT add alternatives.
-PRESERVE ALL HTML TAGS, attributes, CSS styles, color codes EXACTLY AS-IS.
-Only translate the visible human-readable text content.
+PRESERVE ALL HTML TAGS and their attributes EXACTLY AS-IS, but TRANSLATE ALL human-readable text inside every tag including <memo>, <small>, <summary>, <font>, code blocks, and HTML comments.
+Translate EVERYTHING that is readable text. Only keep tag names, attributes, and CSS values untouched.
 If the input is a single word, return only the translated single word.`;
 
 // ─── 스타일 프리셋 정의 ──────────────────────────────
@@ -53,7 +53,8 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
         forceLang = null,
         prevTranslation = null,
         contextMessages = [],
-        abortSignal = null
+        abortSignal = null,
+        silent = false
     } = options;
 
     if (!text || text.trim() === "") return null;
@@ -75,14 +76,14 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
     if (!prevTranslation) {
         const cached = await getCached(text, targetLang);
         if (cached) {
-            catNotify(`${getThemeEmoji()} 캐시 히트! ~${Math.round(text.length * 0.5)} 토큰 절약`, "success");
+            if (!silent) catNotify(`${getThemeEmoji()} 캐시 히트! ~${Math.round(text.length * 0.5)} 토큰 절약`, "success");
             return { text: cached.translated, lang: targetLang, fromCache: true };
         }
     }
 
     // 3️⃣ 사전 치환 (Pre-swap)
     const { swapped: preSwapped, matchCount } = applyPreReplaceWithCount(text.trim(), settings.dictionary, isToEnglish);
-    if (matchCount > 0) {
+    if (matchCount > 0 && !silent) {
         catNotify(`🐾 사전 ${matchCount}개 단어 매칭됨!`, "success");
     }
 
@@ -168,10 +169,10 @@ export async function fetchTranslation(text, settings, stContext, options = {}) 
 function assemblePrompt(text, targetLang, isToEnglish, settings, options = {}) {
     const { prevTranslation, contextMessages = [] } = options;
 
-    // 🎯 짧은 텍스트 (50자 미만) → 경량 프롬프트
+    // 🎯 짧은 텍스트 (50자 미만) → 초경량 프롬프트
     if (text.length < 50 && !prevTranslation && contextMessages.length === 0) {
         const lang = isToEnglish ? 'English' : targetLang;
-        return `Translate to ${lang}. Output ONLY the translation, nothing else.\n\n${text}`;
+        return `${text}\n\n(Translate the above to ${lang}. Reply with ONLY the translation.)`;
     }
 
     // 시스템 보호막
