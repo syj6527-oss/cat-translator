@@ -13,6 +13,29 @@ const EXPIRY_DAYS = 30;
 const CACHE_KEY_VERSION = 'raw-v4';
 
 let db = null;
+let storageMode = 'uninitialized';
+export function getCacheStorageMode() { return storageMode; }
+function createMemoryDatabase() {
+    const records = new Map();
+    const request = action => {
+        const req = {};
+        queueMicrotask(() => { try { req.result = action(); req.onsuccess?.({ target: req }); }
+            catch (error) { req.error = error; req.onerror?.({ target: req }); } });
+        return req;
+    };
+    const store = {
+        get: key => request(() => records.get(key)),
+        put: value => request(() => {
+            const key = value.key ?? value.id;
+            records.delete(key); records.set(key, structuredClone(value));
+            while (records.size > 200) records.delete(records.keys().next().value);
+        }),
+        delete: key => request(() => records.delete(key)),
+        clear: () => request(() => records.clear()),
+        index: () => ({ openCursor: () => request(() => null) })
+    };
+    return { transaction: () => ({ objectStore: () => store }) };
+}
 let stats = { hits: 0, misses: 0, tokensSaved: 0 };
 
 // ─── DB 초기화 ──────────────────────────────────────
@@ -32,12 +55,18 @@ export async function initCache() {
         };
         request.onsuccess = (event) => {
             db = event.target.result;
+            storageMode = 'indexeddb';
             loadStats().then(() => {
                 cleanExpired();
                 resolve(db);
             });
         };
         request.onerror = () => reject(request.error);
+    }).catch(error => {
+        db = createMemoryDatabase();
+        storageMode = 'memory';
+        console.warn('[CAT] 영구 캐시 사용 불가 — 현재 탭에서만 메모리 캐시 사용', error?.name || 'StorageError');
+        return db;
     });
 }
 
@@ -76,14 +105,20 @@ function normalizeSourceForKey(text) {
     return String(text || '').replace(/\r\n/g, '\n').trim();
 }
 
-export function buildCacheKey(originalText, targetLang, modelKey = 'default') {
-    return `${CACHE_KEY_VERSION}:${normalizeSourceForKey(originalText)}::${targetLang}::${modelKey}`;
+export function buildCacheKey(originalText, targetLang, modelKey = 'default', scopeKey = null) {
+    const base = `${CACHE_KEY_VERSION}:${normalizeSourceForKey(originalText)}::${targetLang}::${modelKey}`;
+    return scopeKey === null ? base : `${base}::scope-v2:${scopeKey}`;
 }
 
+function legacyHistoryKey(originalText, targetLang, modelKey) {
+    return buildCacheKey(originalText, targetLang, modelKey.split('::identity:')[0]);
+}
+
+
 // ─── 캐시 조회 (원문 구조 + 모델 + 문맥별 분리) ─────────────────────
-export async function getCached(originalText, targetLang, modelKey = 'default', scopeKey = '') {
+export async function getCached(originalText, targetLang, modelKey = 'default', scopeKey = '', countHit = true) {
     if (!db) return null;
-    const key = buildCacheKey(originalText, targetLang, modelKey);
+    const key = buildCacheKey(originalText, targetLang, modelKey, scopeKey);
 
     try {
         const tx = db.transaction(STORE_TRANSLATIONS, 'readonly');
@@ -91,9 +126,7 @@ export async function getCached(originalText, targetLang, modelKey = 'default', 
         const result = await promisifyRequest(store.get(key));
 
         if (result && !isExpired(result.timestamp) && (result.scopeKey || '') === scopeKey) {
-            stats.hits++;
-            stats.tokensSaved += estimateTokens(originalText);
-            saveStats();
+            if (countHit) recordCacheUse(originalText, true);
             return result;
         }
     } catch (e) { /* miss */ }
@@ -103,19 +136,38 @@ export async function getCached(originalText, targetLang, modelKey = 'default', 
     return null;
 }
 
+// Engine validation precedes a cache hit in user-visible counters.
+export function recordCacheUse(originalText, accepted) {
+    if (accepted) { stats.hits++; stats.tokensSaved += estimateTokens(originalText); }
+    else stats.misses++;
+    saveStats();
+}
+
 // ─── 캐시 삭제 (특정 항목) ──────────────────────────────────────
-export async function deleteCached(originalText, targetLang, modelKey = 'default') {
+export async function deleteCached(originalText, targetLang, modelKey = 'default', scopeKey = null) {
     if (!db) return;
-    const key = buildCacheKey(originalText, targetLang, modelKey);
+    const key = buildCacheKey(originalText, targetLang, modelKey, scopeKey);
     try {
         const tx = db.transaction(STORE_TRANSLATIONS, 'readwrite');
         const store = tx.objectStore(STORE_TRANSLATIONS);
+        if (scopeKey === null) {
+            const entry = await promisifyRequest(store.get(key));
+            for (const scopedKey of entry?.scopeKeys || []) await promisifyRequest(store.delete(scopedKey));
+            // Preserve manual history while invalidating reusable results.
+            return;
+        }
         await promisifyRequest(store.delete(key));
     } catch (e) { /* ignore */ }
 }
 
 // ─── 캐시 저장 (원문 구조 + 모델 + 문맥별 분리) ──────────────────────
-export async function setCached(originalText, targetLang, translated, thought = null, modelKey = 'default', literal = null, scopeKey = '') {
+let cacheWriteQueue = Promise.resolve();
+export function setCached(...args) {
+    const pending = cacheWriteQueue.then(() => writeCached(...args));
+    cacheWriteQueue = pending.catch(() => {});
+    return pending;
+}
+async function writeCached(originalText, targetLang, translated, thought = null, modelKey = 'default', literal = null, scopeKey = '') {
     if (!db) return;
     const normalized = normalizeText(originalText);
     const key = buildCacheKey(originalText, targetLang, modelKey);
@@ -128,6 +180,7 @@ export async function setCached(originalText, targetLang, translated, thought = 
         let existing = null;
         try {
             existing = await promisifyRequest(store.get(key));
+            if (!existing) existing = await promisifyRequest(store.get(legacyHistoryKey(originalText, targetLang, modelKey)));
         } catch (e) { /* 없으면 null */ }
 
         const history = existing?.history || [];
@@ -154,11 +207,14 @@ export async function setCached(originalText, targetLang, translated, thought = 
             lang: targetLang,
             thought,
             scopeKey,
+            scopeKeys: [...new Set([...(existing?.scopeKeys || []), buildCacheKey(originalText, targetLang, modelKey, scopeKey)])],
             history,
             timestamp: Date.now()
         };
 
         await promisifyRequest(store.put(entry));
+        // History remains an aggregate; reusable translations have distinct context keys.
+        await promisifyRequest(store.put({ ...entry, history: [], key: buildCacheKey(originalText, targetLang, modelKey, scopeKey) }));
     } catch (e) { console.error('[CAT] Cache write error:', e); }
 }
 
@@ -170,7 +226,7 @@ export async function getHistory(originalText, targetLang, modelKey = 'default')
     try {
         const tx = db.transaction(STORE_TRANSLATIONS, 'readonly');
         const store = tx.objectStore(STORE_TRANSLATIONS);
-        const result = await promisifyRequest(store.get(key));
+        const result = await promisifyRequest(store.get(key)) || await promisifyRequest(store.get(legacyHistoryKey(originalText, targetLang, modelKey)));
         return result?.history || [];
     } catch (e) { return []; }
 }
@@ -183,7 +239,7 @@ export async function togglePin(originalText, targetLang, translationText, model
     try {
         const tx = db.transaction(STORE_TRANSLATIONS, 'readwrite');
         const store = tx.objectStore(STORE_TRANSLATIONS);
-        const result = await promisifyRequest(store.get(key));
+        const result = await promisifyRequest(store.get(key)) || await promisifyRequest(store.get(legacyHistoryKey(originalText, targetLang, modelKey)));
         if (result && result.history) {
             const item = result.history.find(h => h.text === translationText);
             if (item) {
@@ -201,7 +257,7 @@ export async function deleteHistoryItem(originalText, targetLang, translationTex
     try {
         const tx = db.transaction(STORE_TRANSLATIONS, 'readwrite');
         const store = tx.objectStore(STORE_TRANSLATIONS);
-        const result = await promisifyRequest(store.get(key));
+        const result = await promisifyRequest(store.get(key)) || await promisifyRequest(store.get(legacyHistoryKey(originalText, targetLang, modelKey)));
         if (result && result.history) {
             result.history = result.history.filter(h => h.text !== translationText);
             await promisifyRequest(store.put(result));
@@ -211,6 +267,7 @@ export async function deleteHistoryItem(originalText, targetLang, translationTex
 
 // ─── 캐시 전체 삭제 ─────────────────────────────────
 export async function clearAllCache() {
+    await cacheWriteQueue;
     if (!db) return;
     try {
         const tx = db.transaction(STORE_TRANSLATIONS, 'readwrite');

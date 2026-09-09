@@ -59,7 +59,8 @@ export function catNotify(message, type = 'success') {
     const emoji = getThemeEmoji();
     const colors = { success: '#2ecc71', warning: '#f39c12', error: '#e74c3c', progress: '#f39c12', autosave: '#1e8449' };
     const bgColor = colors[type] || colors.success;
-    const displayMsg = message.replace(/^(🐱|🐯)\s*/, `${emoji} `);
+    const displayMsg = String(message).replace(/^(🐱|🐯)\s*/, `${emoji} `)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     const notifyHtml = $(`<div class="cat-notification cat-native-font" style="background-color: ${bgColor};">${displayMsg}</div>`);
     $('body').append(notifyHtml);
     
@@ -93,7 +94,7 @@ export function catNotifyProgress(message, onAbort) {
 }
 
 // 🚨 정밀 클리너: AI가 추가한 래핑만 제거, 원본 코드블록/YAML 보존!
-export const CAT_BETA_VERSION = '1.3.2';
+export const CAT_BETA_VERSION = '1.4.1';
 export const CAT_BUILD_CHANNEL = 'release';
 
 export function cleanResult(text, originalText = null, structureProtection = null) {
@@ -1561,7 +1562,83 @@ function balanceQuotes(text, originalText) {
     return text;
 }
 
-export function getCacheModelKey(settings) {
+export function normalizeContextRange(value, fallback = 1) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? Math.min(6, Math.max(0, parsed)) : fallback;
+}
+
+export function resolveMessageEventId(event) {
+    const value = event && typeof event === 'object'
+        ? event.messageId ?? event.message_id ?? event.mesId ?? event.id : event;
+    if (!/^(0|[1-9]\d*)$/.test(String(value))) return null;
+    const id = Number(value);
+    return Number.isSafeInteger(id) ? id : null;
+}
+
+export function createAutoTranslationScheduler({ getChat, getMode, process, onError, delay = 500 }) {
+    const pending = new Map();
+    return event => {
+        const id = resolveMessageEventId(event);
+        const chat = getChat();
+        const msg = chat?.[id];
+        if (id === null || !msg || !['output', 'both'].includes(getMode())) return;
+        const old = pending.get(id);
+        if (old) clearTimeout(old);
+        const swipe = msg.swipe_id;
+        const timer = setTimeout(async () => {
+            if (pending.get(id) !== timer) return;
+            pending.delete(id);
+            if (getChat() !== chat || chat[id] !== msg || msg.swipe_id !== swipe ||
+                !['output', 'both'].includes(getMode()) || msg.is_user || msg.is_system || msg.is_hidden ||
+                !String(msg.mes || '').trim()) return;
+            try { await process(id, false, null, false, true); }
+            catch (error) { onError(error); }
+        }, delay);
+        pending.set(id, timer);
+    };
+}
+
+export function suggestDictionarySource(selectedText, originalText, dictionary = '') {
+    const selected = String(selectedText || '').trim();
+    const original = String(originalText || '');
+    const hasWord = word => new RegExp(`(?<![A-Za-z])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z])`, 'i').test(original);
+    const mapped = dictionary.split('\n').map(line => line.split('='))
+        .filter(parts => parts.length >= 2 && parts.slice(1).join('=').trim() === selected)
+        .map(parts => parts[0].trim()).filter(word => word && hasWord(word));
+    if (mapped.length === 1) return { source: mapped[0], candidates: mapped, reason: 'dictionary' };
+    const ignored = new Set('The A An He She It I They We You His Her Their This That Then But And Not No Yes On In At To From With When What Why How There Here As My Our Your Its Of For Is Was Were Be Do Did Had Have So Now Still After Before Once Something Somewhere One Two Three Response SOURCE English Korean'.split(' '));
+    const prose = original.replace(/```[\s\S]*?```/g, ' ').replace(/<[^>]*>/g, ' ');
+    const words = [...prose.matchAll(/\b[A-Z][a-z]+(?:['’-][A-Z]?[a-z]+)*\b/g)].map(match => match[0]).filter(word => !ignored.has(word));
+    const fullNames = [...prose.matchAll(/\b[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+){1,2}\b/g)]
+        .map(match => match[0]).filter(name => name.split(/[ \t]+/).every(word => !ignored.has(word)));
+    const candidates = [...new Set([...mapped, ...fullNames, ...words])].slice(0, 60);
+    const skeleton = name => {
+        const initial = ['g','kk','n','d','tt','l','m','b','pp','s','ss','','j','jj','ch','k','t','p','h'];
+        const final = ['','g','kk','gs','n','nj','nh','d','l','lg','lm','lb','ls','lt','lp','lh','m','b','bs','s','ss','ng','j','ch','k','t','p','h'];
+        let value = [...name].map(ch => {
+            const code = ch.charCodeAt(0) - 0xAC00;
+            return code >= 0 && code < 11172 ? initial[Math.floor(code / 588)] + final[code % 28] : ch;
+        }).join('').toLowerCase();
+        return value.replace(/ph/g, 'f').replace(/th/g, 't').replace(/x/g, 'ks').replace(/c(?=[iey])/g, 's')
+            .replace(/[cgq]/g, 'k').replace(/v/g, 'b').replace(/r/g, 'l').replace(/[aeiouyw\s'’-]/g, '').replace(/(.)\1+/g, '$1');
+    };
+    const key = skeleton(selected);
+    const matches = key.length >= 2 ? candidates.filter(word => skeleton(word) === key) : [];
+    return { source: matches.length === 1 ? matches[0] : '', candidates, reason: matches.length === 1 ? 'spelling-candidate' : 'ambiguous' };
+}
+
+export function getCacheModelKey(settings, stContext = null) {
+    const context = stContext || (typeof SillyTavern !== 'undefined' ? SillyTavern.getContext?.() : null);
+    const profile = context?.extensionSettings?.connectionManager?.profiles?.find(p => String(p.id) === String(settings.profile));
+    const fields = ['model', 'modelName', 'model_name', 'modelId', 'model_id', 'api', 'mode', 'api-url', 'api_url', 'endpoint', 'source', 'preset', 'instruct', 'proxy', 'prompt-post-processing'];
+    const pickIdentity = (value, depth = 0) => [
+        ...fields.map(field => [field, value?.[field] ?? '']),
+        ...(depth < 3 ? ['settings', 'config', 'connection', 'apiSettings', 'parameters', 'params', 'provider'].filter(field => value?.[field] && typeof value[field] === 'object').map(field => [field, pickIdentity(value[field], depth + 1)]) : [])
+    ];
+    const identity = settings.profile
+        ? pickIdentity(profile)
+        : [settings.directModel || '', settings.customModelName || '', settings.vertexProject || '', settings.vertexRegion || '', settings.maxTokens || ''];
+    const identityHash = hashCacheSetting(JSON.stringify(identity));
     let key;
     if (settings.profile) key = `profile:${settings.profile}`;
     else key = settings.directModel || 'default';
@@ -1577,9 +1654,9 @@ export function getCacheModelKey(settings) {
     const contextRange = Number.isFinite(Number(settings.contextRange)) ? Number(settings.contextRange) : 1;
     const fastMode = settings.nonGeminiFastMode || 'off';
     
-    return `${key}::cache-v5::dialogue:${dialogueMode}::literal:${literalMode}` +
+    return `${key}::cache-v6::dialogue:${dialogueMode}::literal:${literalMode}` +
         `::style:${style}::temp:${temperature}::context:${contextRange}` +
-        `::fast:${fastMode}::commonPrompt:${commonPromptHash}::narrationPrompt:${narrationPromptHash}::dialoguePrompt:${dialoguePromptHash}::dict:${dictionaryHash}`;
+        `::fast:${fastMode}::commonPrompt:${commonPromptHash}::narrationPrompt:${narrationPromptHash}::dialoguePrompt:${dialoguePromptHash}::dict:${dictionaryHash}::identity:${identityHash}`;
 }
 
 function hashCacheSetting(value) {

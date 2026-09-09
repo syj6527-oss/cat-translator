@@ -1,7 +1,7 @@
 {
     "name": "cat-translator",
     "display_name": "🐱 Cat Translator",
-    "version": "1.3.2",
+    "version": "1.4.1",
     "description": "SillyTavern용 맞춤형 번역 확장 — 서술·대사 지침 분리·내부 입력 번역·구조 자동 복원",
     "author": "냥헴 & GPT & Claude",
     "js": "index.js",
